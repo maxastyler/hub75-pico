@@ -44,7 +44,7 @@ pub const fn fb_bytes(w: usize, h: usize, b: usize) -> usize {
     w * h / 2 * b
 }
 
-pub struct DisplayMemory<'a, const W: usize, const H: usize, const B: usize, C: RgbColor>
+pub struct DisplayMemory<'a, const W: usize, const H: usize, const B: usize>
 where
     [(); fb_bytes(W, H, B)]: Sized,
 {
@@ -53,7 +53,7 @@ where
     fb1: [u8; fb_bytes(W, H, B)],
     delays: [u32; B],
     delaysptr: [u32; 1],
-    lut: &'a dyn Lut<B, C>,
+    lut: &'a dyn Lut,
     brightness: u8,
 }
 
@@ -68,11 +68,11 @@ const fn delays<const B: usize>() -> [u32; B] {
     arr
 }
 
-impl<'a, const W: usize, const H: usize, const B: usize, C: RgbColor> DisplayMemory<'a, W, H, B, C>
+impl<'a, const W: usize, const H: usize, const B: usize> DisplayMemory<'a, W, H, B>
 where
     [(); fb_bytes(W, H, B)]: Sized,
 {
-    pub const fn new(lut: &'a impl lut::Lut<B, C>) -> Self {
+    pub const fn new(lut: &'a impl lut::Lut) -> Self {
         let fb0 = [0; fb_bytes(W, H, B)];
         let fb1 = [0; fb_bytes(W, H, B)];
         let fbptr: [u32; 1] = [0];
@@ -104,7 +104,7 @@ where
         }
     }
 
-    pub fn set_pixel(&mut self, x: usize, y: usize, color: C) {
+    pub fn set_pixel(&mut self, x: usize, y: usize, color: Rgb888) {
         // invert the screen
         let x = W - 1 - x;
         let y = H - 1 - y;
@@ -138,8 +138,8 @@ where
     }
 }
 
-impl<'a, const W: usize, const H: usize, const B: usize, C: RgbColor> OriginDimensions
-    for DisplayMemory<'a, W, H, B, C>
+impl<'a, const W: usize, const H: usize, const B: usize> OriginDimensions
+    for DisplayMemory<'a, W, H, B>
 where
     [(); fb_bytes(W, H, B)]: Sized,
 {
@@ -148,12 +148,11 @@ where
     }
 }
 
-impl<'a, const W: usize, const H: usize, const B: usize, C: RgbColor> DrawTarget
-    for DisplayMemory<'a, W, H, B, C>
+impl<'a, const W: usize, const H: usize, const B: usize> DrawTarget for DisplayMemory<'a, W, H, B>
 where
     [(); fb_bytes(W, H, B)]: Sized,
 {
-    type Color = C;
+    type Color = Rgb888;
 
     type Error = core::convert::Infallible;
 
@@ -185,9 +184,9 @@ async fn main(spawner: Spawner) {
     const H: usize = 32;
     const B: usize = 8;
 
-    let lut: GammaLut<B, Rgb888, _> = GammaLut::new().init((1.0, 1.0, 1.0));
+    let lut: GammaLut<_> = GammaLut::new().init((1.0, 1.0, 1.0));
 
-    let mut dm: DisplayMemory<W, H, B, Rgb888> = DisplayMemory::new(&lut);
+    let mut dm: DisplayMemory<W, H, B> = DisplayMemory::new(&lut);
 
     let pio = p.PIO0;
     let Pio {
@@ -408,8 +407,8 @@ async fn main(spawner: Spawner) {
     let mut t: f32 = 0.0;
     let mut instant = embassy_time::Instant::now();
     loop {
-        let i: i32 = (W / 2) as i32 + (20.0 * libm::sinf(3.0 * t)) as i32;
-        let j: i32 = (H / 2) as i32 + (20.0 * libm::cosf(2.1 * t)) as i32;
+        let i: i32 = (W / 2) as i32 + (15.0 * libm::sinf(3.0 * t)) as i32;
+        let j: i32 = (H / 2) as i32 + (15.0 * libm::cosf(2.1 * t)) as i32;
         Circle::with_center(Point::new(i as i32, j as i32), 30)
             .draw_styled(&PrimitiveStyle::with_fill(Rgb888::WHITE), &mut dm)
             .unwrap();
@@ -417,10 +416,13 @@ async fn main(spawner: Spawner) {
             .draw_styled(&PrimitiveStyle::with_fill(Rgb888::RED), &mut dm)
             .unwrap();
         Circle::with_center(Point::new((i + 4) as i32, (j + 4) as i32), 4)
+            .draw_styled(&PrimitiveStyle::with_fill(Rgb888::BLUE), &mut dm)
+            .unwrap();
+        Circle::with_center(Point::new(i as i32 - 4, j as i32 - 4), i.max(0) as u32 / 10)
             .draw_styled(&PrimitiveStyle::with_fill(Rgb888::GREEN), &mut dm)
             .unwrap();
-        Circle::with_center(Point::new(i as i32 - 4, j as i32 - 4), 10)
-            .draw_styled(&PrimitiveStyle::with_fill(Rgb888::BLUE), &mut dm)
+        Circle::with_center(Point::new(i as i32 + 6, j as i32 - 8), 4)
+            .draw_styled(&PrimitiveStyle::with_fill(Rgb888::YELLOW), &mut dm)
             .unwrap();
 
         dm.swap_buffers(&fb_loop_ch);

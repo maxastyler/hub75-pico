@@ -1,9 +1,9 @@
 use core::marker::PhantomData;
-use embedded_graphics::prelude::*;
+use embedded_graphics::{pixelcolor::Rgb888, prelude::*};
 use libm::{powf, roundf};
 
-pub trait Lut<const B: usize, C: RgbColor> {
-    fn lookup(&self, color: C) -> (u16, u16, u16);
+pub trait Lut {
+    fn lookup(&self, color: Rgb888) -> (u16, u16, u16);
 }
 
 pub trait LutState {}
@@ -12,32 +12,24 @@ pub struct Init;
 impl LutState for Uninit {}
 impl LutState for Init {}
 
-pub struct GammaLut<const B: usize, C: RgbColor, S>
-where
-    [(); 1 << B]: Sized,
-{
-    r: [u16; 1 << B],
-    g: [u16; 1 << B],
-    b: [u16; 1 << B],
-    _color: PhantomData<C>,
+pub struct GammaLut<S> {
+    r: [u16; 1 << 8],
+    g: [u16; 1 << 8],
+    b: [u16; 1 << 8],
     _state: PhantomData<S>,
 }
 
-impl<const B: usize, C: RgbColor> GammaLut<B, C, Uninit>
-where
-    [(); 1 << B]: Sized,
-{
+impl GammaLut<Uninit> {
     pub const fn new() -> Self {
         Self {
-            r: [0; 1 << B],
-            g: [0; 1 << B],
-            b: [0; 1 << B],
-            _color: PhantomData,
+            r: [0; 1 << 8],
+            g: [0; 1 << 8],
+            b: [0; 1 << 8],
             _state: PhantomData,
         }
     }
 
-    pub fn init(mut self, gamma: (f32, f32, f32)) -> GammaLut<B, C, Init> {
+    pub fn init(mut self, gamma: (f32, f32, f32)) -> GammaLut<Init> {
         fn calculate_lookup_value(
             index: usize,
             source_max: u16,
@@ -52,9 +44,9 @@ where
 
         let mut i = 0;
         while i < self.r.len() {
-            self.r[i] = calculate_lookup_value(i, C::MAX_R as u16, (1 << B) - 1, gamma.0);
-            self.g[i] = calculate_lookup_value(i, C::MAX_G as u16, (1 << B) - 1, gamma.1);
-            self.b[i] = calculate_lookup_value(i, C::MAX_B as u16, (1 << B) - 1, gamma.2);
+            self.r[i] = calculate_lookup_value(i, Rgb888::MAX_R as u16, (1 << 8) - 1, gamma.0);
+            self.g[i] = calculate_lookup_value(i, Rgb888::MAX_G as u16, (1 << 8) - 1, gamma.1);
+            self.b[i] = calculate_lookup_value(i, Rgb888::MAX_B as u16, (1 << 8) - 1, gamma.2);
             i += 1;
         }
 
@@ -62,31 +54,27 @@ where
             r: self.r,
             g: self.g,
             b: self.b,
-            _color: PhantomData,
             _state: PhantomData,
         }
     }
 }
 
-impl<const B: usize, C: RgbColor> Lut<B, C> for GammaLut<B, C, Init>
+impl Lut for GammaLut<Init>
 where
-    [(); 1 << B]: Sized,
+    [(); 1 << 8]: Sized,
 {
-    fn lookup(&self, color: C) -> (u16, u16, u16) {
-        let r = self.r[color.r() as usize];
-        let g = self.g[color.g() as usize];
-        let b = self.b[color.b() as usize];
+    fn lookup(&self, colour: Rgb888) -> (u16, u16, u16) {
+        let r = self.r[colour.r() as usize];
+        let g = self.g[colour.g() as usize];
+        let b = self.b[colour.b() as usize];
         (r, g, b)
     }
 }
 
 pub struct Identity;
 
-impl<const B: usize, C: RgbColor> Lut<B, C> for Identity
-where
-    [(); 1 << B]: Sized,
-{
-    fn lookup(&self, color: C) -> (u16, u16, u16) {
-        (color.r() as u16, color.g() as u16, color.b() as u16)
+impl Lut for Identity {
+    fn lookup(&self, colour: Rgb888) -> (u16, u16, u16) {
+        (colour.r() as u16, colour.g() as u16, colour.b() as u16)
     }
 }
