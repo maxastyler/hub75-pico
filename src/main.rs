@@ -95,12 +95,12 @@ async fn main(spawner: Spawner) {
         } else {
             FrameBuffer::new(&mut fb_bytes_1, &display)
         };
-        Circle::with_center(Point::new(i as i32, j as i32), 60)
-            .draw_styled(
-                &PrimitiveStyle::with_fill(Rgb888::CSS_ORANGE),
-                &mut framebuffer,
-            )
-            .unwrap();
+        // Circle::with_center(Point::new(i as i32, j as i32), 60)
+        //     .draw_styled(
+        //         &PrimitiveStyle::with_fill(Rgb888::CSS_ORANGE),
+        //         &mut framebuffer,
+        //     )
+        //     .unwrap();
         embedded_graphics::primitives::Line::with_delta(Point::new(0, 0), Point::new(100, 100))
             .draw_styled(
                 &PrimitiveStyle::with_stroke(Rgb888::CSS_PURPLE, 4),
@@ -133,7 +133,6 @@ async fn main(spawner: Spawner) {
                 .unwrap();
         }
 
-        Timer::after_millis(1).await;
         let new = embassy_time::Instant::now();
         t += ((new - instant).as_millis() as f32) / 1000.0;
         instant = new;
