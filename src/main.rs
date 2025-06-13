@@ -51,15 +51,15 @@ async fn main(spawner: Spawner) {
     let mut fb_bytes_1 = [0u8; fb_bytes(W, H, B)];
     let mut fb_bytes_2 = [0u8; fb_bytes(W, H, B)];
 
-    let comms = Comms::<10>::new(
-        spawner,
-        p.PIN_23,
-        p.PIN_25,
-        p.PIN_24,
-        p.PIN_29,
-        p.DMA_CH6,
-        Pio::new(p.PIO1, Irqs),
-    ).await;
+    // let comms = Comms::<10>::new(
+    //     spawner,
+    //     p.PIN_23,
+    //     p.PIN_25,
+    //     p.PIN_24,
+    //     p.PIN_29,
+    //     p.DMA_CH6,
+    //     Pio::new(p.PIO1, Irqs),
+    // ).await;
 
     let mut display: Display<64, 32, _, _, _, _> = Display::new(
         &lut,
@@ -95,6 +95,25 @@ async fn main(spawner: Spawner) {
         } else {
             FrameBuffer::new(&mut fb_bytes_1, &display)
         };
+        Circle::with_center(Point::new(i as i32, j as i32), 60)
+            .draw_styled(
+                &PrimitiveStyle::with_fill(Rgb888::CSS_ORANGE),
+                &mut framebuffer,
+            )
+            .unwrap();
+        embedded_graphics::primitives::Line::with_delta(Point::new(0, 0), Point::new(100, 100))
+            .draw_styled(
+                &PrimitiveStyle::with_stroke(Rgb888::CSS_PURPLE, 4),
+                &mut framebuffer,
+            )
+            .unwrap();
+
+        embedded_graphics::primitives::Line::with_delta(Point::new(64, 32), Point::new(-100, 100))
+            .draw_styled(
+                &PrimitiveStyle::with_stroke(Rgb888::CSS_PINK, 10),
+                &mut framebuffer,
+            )
+            .unwrap();
 
         Circle::with_center(Point::new(i as i32, j as i32), 30)
             .draw_styled(&PrimitiveStyle::with_fill(Rgb888::WHITE), &mut framebuffer)
