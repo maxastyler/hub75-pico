@@ -72,7 +72,7 @@ impl<'a, const W: usize, const H: usize, const B: usize> DisplayMemory<'a, W, H,
 where
     [(); fb_bytes(W, H, B)]: Sized,
 {
-    pub const fn new(lut: &'a impl lut::Lut) -> Self {
+    pub fn new(lut: &'a impl lut::Lut) -> Self {
         let fb0 = [0; fb_bytes(W, H, B)];
         let fb1 = [0; fb_bytes(W, H, B)];
         let fbptr: [u32; 1] = [0];
