@@ -95,8 +95,7 @@ where
     ) {
         if self.fbptr[0] == (self.fb0.as_ptr() as u32) {
             self.fbptr[0] = self.fb1.as_ptr() as u32;
-            while !fb_loop_ch.regs().ctrl_trig().read().busy() {
-	    }
+            while !fb_loop_ch.regs().ctrl_trig().read().busy() {}
             self.fb0[0..].fill(0);
         } else {
             self.fbptr[0] = self.fb0.as_ptr() as u32;
@@ -165,6 +164,8 @@ where
         for Pixel(coord, color) in pixels.into_iter() {
             if coord.x < <usize as TryInto<i32>>::try_into(W).unwrap()
                 && coord.y < <usize as TryInto<i32>>::try_into(H).unwrap()
+                && coord.x >= 0
+                && coord.y >= 0
             {
                 self.set_pixel(coord.x as usize, coord.y as usize, color);
             }
@@ -184,7 +185,7 @@ async fn main(spawner: Spawner) {
     const H: usize = 32;
     const B: usize = 8;
 
-    let mut dm: DisplayMemory<W, H, B, Rgb555> = DisplayMemory::new(&lut);
+    let mut dm: DisplayMemory<W, H, B, Rgb888> = DisplayMemory::new(&lut);
 
     let pio = p.PIO0;
     let Pio {
@@ -227,7 +228,7 @@ async fn main(spawner: Spawner) {
         let mut cfg = Config::default();
         cfg.use_program(&common.load_program(&rgb_prog.program), &[&clk]);
         cfg.set_out_pins(&[&r1, &g1, &b1, &r2, &g2, &b2]);
-        cfg.clock_divider = fixed::FixedU32::from_num(1);
+        cfg.clock_divider = fixed::FixedU32::from_num(4);
         cfg.shift_out.direction = ShiftDirection::Right;
         cfg.shift_out.auto_fill = true;
         cfg.fifo_join = FifoJoin::TxOnly;
@@ -260,11 +261,13 @@ async fn main(spawner: Spawner) {
         ".wrap",
     );
 
+    let other_frac = 1.2;
+
     let cfg = {
         let mut cfg = Config::default();
         cfg.use_program(&common.load_program(&row_prog.program), &[&lat]);
         cfg.set_out_pins(&[&a, &b, &c, &d]);
-        cfg.clock_divider = FixedU32::<U8>::from_num(1) + FixedU32::<U8>::from_bits(0b1);
+        cfg.clock_divider = FixedU32::<U8>::from_num(other_frac);
         cfg
     };
 
@@ -288,7 +291,7 @@ async fn main(spawner: Spawner) {
     let cfg = {
         let mut cfg = Config::default();
         cfg.use_program(&common.load_program(&delay_prog.program), &[&oe]);
-        cfg.clock_divider = FixedU32::<U8>::from_num(1) + FixedU32::<U8>::from_bits(0b1);
+        cfg.clock_divider = FixedU32::<U8>::from_num(other_frac);
         cfg.shift_out.auto_fill = true;
         cfg.fifo_join = FifoJoin::TxOnly;
         cfg
@@ -321,7 +324,7 @@ async fn main(spawner: Spawner) {
     fb_ch
         .regs()
         .trans_count()
-        .write(|c| c.0 = fb_bytes(64, 32, 8) as u32 / 4);
+        .write(|c| c.0 = fb_bytes(W, H, B) as u32 / 4);
     fb_ch
         .regs()
         .write_addr()
@@ -400,14 +403,32 @@ async fn main(spawner: Spawner) {
         .al2_write_addr_trig()
         .write(|c| *c = oe_ch.regs().read_addr().as_ptr() as u32);
 
-    let mut i: u32 = 0;
+    let mut t: f32 = 0.0;
+    let mut instant = embassy_time::Instant::now();
     loop {
-	i = (i + 1) % W as u32;
-        Circle::new(Point::new(i as i32, 10), 30)
-            .draw_styled(&PrimitiveStyle::with_fill(Rgb555::WHITE), &mut dm)
+        let i: i32 = (W/2) as i32 + (20.0*libm::sinf(3.0 * t)) as i32;
+        let j: i32 = (H/2) as i32 + (20.0*libm::cosf(2.1 * t)) as i32;
+        Circle::with_center(Point::new(i as i32, j as i32), 30)
+            .draw_styled(&PrimitiveStyle::with_fill(Rgb888::WHITE), &mut dm)
             .unwrap();
-
+        Circle::with_center(Point::new(i as i32, j as i32), 15)
+            .draw_styled(&PrimitiveStyle::with_fill(Rgb888::RED), &mut dm)
+            .unwrap();
+        Circle::with_center(Point::new((i + 4) as i32, (j + 4) as i32), 4)
+            .draw_styled(&PrimitiveStyle::with_fill(Rgb888::GREEN), &mut dm)
+            .unwrap();
+        Circle::with_center(Point::new(i as i32 - 4, j as i32 - 4), 10)
+            .draw_styled(&PrimitiveStyle::with_fill(Rgb888::BLUE), &mut dm)
+            .unwrap();
+        for i in 0..100 {
+            Circle::with_center(Point::new(i*3 as i32, j + i), 2)
+                .draw_styled(&PrimitiveStyle::with_fill(Rgb888::CSS_PINK), &mut dm)
+                .unwrap();
+        }
         dm.swap_buffers(&fb_loop_ch);
-	Timer::after_millis(50).await;
+	Timer::after_millis(1).await;
+	let new = embassy_time::Instant::now();
+        t += ((new - instant).as_millis() as f32) / 1000.0;
+	instant = new;
     }
 }
