@@ -13,7 +13,7 @@ use embassy_rp::pac::DMA;
 use embassy_rp::pac::dma::Dma;
 use embassy_rp::pac::dma::regs::CtrlTrig;
 use embassy_rp::pac::dma::vals::{DataSize, TreqSel};
-use embassy_rp::peripherals::PIO0;
+use embassy_rp::peripherals::{PIO0, PIO1};
 use embassy_rp::pio::{
     Config, Direction, FifoJoin, InterruptHandler as PioInterruptHandler, Pio, ShiftConfig,
     ShiftDirection,
@@ -31,10 +31,11 @@ use pio::{ProgramWithDefines, pio_asm};
 use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
 
-use hub75_pico::{Display, FrameBuffer, GammaLut, fb_bytes};
+use hub75_pico::{Comms, Display, FrameBuffer, GammaLut, fb_bytes};
 
 bind_interrupts!(struct Irqs {
     PIO0_IRQ_0 => PioInterruptHandler<PIO0>;
+    PIO1_IRQ_0 => PioInterruptHandler<PIO1>;
 });
 
 #[embassy_executor::main]
@@ -49,6 +50,16 @@ async fn main(spawner: Spawner) {
 
     let mut fb_bytes_1 = [0u8; fb_bytes(W, H, B)];
     let mut fb_bytes_2 = [0u8; fb_bytes(W, H, B)];
+
+    let comms = Comms::<10>::new(
+        spawner,
+        p.PIN_23,
+        p.PIN_25,
+        p.PIN_24,
+        p.PIN_29,
+        p.DMA_CH6,
+        Pio::new(p.PIO1, Irqs),
+    ).await;
 
     let mut display: Display<64, 32, _, _, _, _> = Display::new(
         &lut,
