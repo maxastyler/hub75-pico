@@ -9,7 +9,6 @@ use embassy_executor::{Executor, Spawner};
 use embassy_rp::dma::Channel;
 use embassy_rp::gpio::{Level, Output, Pin};
 use embassy_rp::multicore::{Stack, spawn_core1};
-use embassy_rp::pac;
 use embassy_rp::pac::DMA;
 use embassy_rp::pac::dma::Dma;
 use embassy_rp::pac::dma::regs::CtrlTrig;
@@ -20,13 +19,20 @@ use embassy_rp::pio::{
     ShiftDirection,
 };
 use embassy_rp::{Peripheral, bind_interrupts};
+use embassy_rp::{PeripheralRef, pac};
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_time::Timer;
+use embedded_graphics::pixelcolor::{Rgb555, Rgb888};
+use embedded_graphics::prelude::*;
+use embedded_graphics::primitives::{Circle, PrimitiveStyle, StyledDrawable};
 use fixed::FixedU32;
 use fixed::types::extra::U8;
+use lut::{Identity, Lut};
 use pio::{ProgramWithDefines, pio_asm};
 use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
+
+mod lut;
 
 bind_interrupts!(struct Irqs {
     PIO0_IRQ_0 => PioInterruptHandler<PIO0>;
@@ -38,7 +44,7 @@ pub const fn fb_bytes(w: usize, h: usize, b: usize) -> usize {
     w * h / 2 * b
 }
 
-pub struct DisplayMemory<const W: usize, const H: usize, const B: usize>
+pub struct DisplayMemory<'a, const W: usize, const H: usize, const B: usize, C: RgbColor>
 where
     [(); fb_bytes(W, H, B)]: Sized,
 {
@@ -47,6 +53,8 @@ where
     fb1: [u8; fb_bytes(W, H, B)],
     delays: [u32; B],
     delaysptr: [u32; 1],
+    lut: &'a dyn Lut<B, C>,
+    brightness: u8,
 }
 
 /// Computes an array with number of clock ticks to wait for every n-th color bit
@@ -60,13 +68,13 @@ const fn delays<const B: usize>() -> [u32; B] {
     arr
 }
 
-impl<const W: usize, const H: usize, const B: usize> DisplayMemory<W, H, B>
+impl<'a, const W: usize, const H: usize, const B: usize, C: RgbColor> DisplayMemory<'a, W, H, B, C>
 where
     [(); fb_bytes(W, H, B)]: Sized,
 {
-    pub const fn new() -> Self {
-        let fb0 = [0xff; fb_bytes(W, H, B)];
-        let fb1 = [0xff; fb_bytes(W, H, B)];
+    pub const fn new(lut: &'a impl lut::Lut<B, C>) -> Self {
+        let fb0 = [0; fb_bytes(W, H, B)];
+        let fb1 = [0; fb_bytes(W, H, B)];
         let fbptr: [u32; 1] = [0];
         let delays = delays();
         let delaysptr: [u32; 1] = [0];
@@ -76,7 +84,93 @@ where
             fb1,
             delays,
             delaysptr,
+            lut,
+            brightness: 255,
         }
+    }
+
+    pub fn swap_buffers<Ch: embassy_rp::dma::Channel>(
+        &mut self,
+        fb_loop_ch: &PeripheralRef<'_, Ch>,
+    ) {
+        if self.fbptr[0] == (self.fb0.as_ptr() as u32) {
+            self.fbptr[0] = self.fb1.as_ptr() as u32;
+            while !fb_loop_ch.regs().ctrl_trig().read().busy() {
+	    }
+            self.fb0[0..].fill(0);
+        } else {
+            self.fbptr[0] = self.fb0.as_ptr() as u32;
+            while !fb_loop_ch.regs().ctrl_trig().read().busy() {}
+            self.fb1[0..].fill(0);
+        }
+    }
+
+    pub fn set_pixel(&mut self, x: usize, y: usize, color: C) {
+        // invert the screen
+        let x = W - 1 - x;
+        let y = H - 1 - y;
+        // Half of the screen
+        let h = y > (H / 2) - 1;
+        let shift = if h { 3 } else { 0 };
+        let (c_r, c_g, c_b) = self.lut.lookup(color);
+        let c_r: u16 = ((c_r as f32) * (self.brightness as f32 / 255f32)) as u16;
+        let c_g: u16 = ((c_g as f32) * (self.brightness as f32 / 255f32)) as u16;
+        let c_b: u16 = ((c_b as f32) * (self.brightness as f32 / 255f32)) as u16;
+        let base_idx = x + ((y % (H / 2)) * W * B);
+        for b in 0..B {
+            // Extract the n-th bit of each component of the color and pack them
+            let cr = c_r >> b & 0b1;
+            let cg = c_g >> b & 0b1;
+            let cb = c_b >> b & 0b1;
+            let packed_rgb = (cb << 2 | cg << 1 | cr) as u8;
+            let idx = base_idx + b * W;
+            if self.fbptr[0] == (self.fb0.as_ptr() as u32) {
+                self.fb1[idx] &= !(0b111 << shift);
+                self.fb1[idx] |= packed_rgb << shift;
+            } else {
+                self.fb0[idx] &= !(0b111 << shift);
+                self.fb0[idx] |= packed_rgb << shift;
+            }
+        }
+    }
+
+    pub fn set_brightness(&mut self, brightness: u8) {
+        self.brightness = brightness
+    }
+}
+
+impl<'a, const W: usize, const H: usize, const B: usize, C: RgbColor> OriginDimensions
+    for DisplayMemory<'a, W, H, B, C>
+where
+    [(); fb_bytes(W, H, B)]: Sized,
+{
+    fn size(&self) -> Size {
+        Size::new(W.try_into().unwrap(), H.try_into().unwrap())
+    }
+}
+
+impl<'a, const W: usize, const H: usize, const B: usize, C: RgbColor> DrawTarget
+    for DisplayMemory<'a, W, H, B, C>
+where
+    [(); fb_bytes(W, H, B)]: Sized,
+{
+    type Color = C;
+
+    type Error = core::convert::Infallible;
+
+    fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error>
+    where
+        I: IntoIterator<Item = Pixel<Self::Color>>,
+    {
+        for Pixel(coord, color) in pixels.into_iter() {
+            if coord.x < <usize as TryInto<i32>>::try_into(W).unwrap()
+                && coord.y < <usize as TryInto<i32>>::try_into(H).unwrap()
+            {
+                self.set_pixel(coord.x as usize, coord.y as usize, color);
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -84,7 +178,13 @@ where
 async fn main(spawner: Spawner) {
     let p = embassy_rp::init(Default::default());
 
-    let mut dm: DisplayMemory<64, 32, 4> = DisplayMemory::new();
+    let lut = Identity;
+
+    const W: usize = 64;
+    const H: usize = 32;
+    const B: usize = 8;
+
+    let mut dm: DisplayMemory<W, H, B, Rgb555> = DisplayMemory::new(&lut);
 
     let pio = p.PIO0;
     let Pio {
@@ -95,8 +195,6 @@ async fn main(spawner: Spawner) {
         ..
     } = Pio::new(pio, Irqs);
 
-    embassy_rp::pac::pio::Pio::instr_mem()
-    
     let mut r1 = common.make_pio_pin(p.PIN_0);
     let mut g1 = common.make_pio_pin(p.PIN_1);
     let mut b1 = common.make_pio_pin(p.PIN_2);
@@ -129,7 +227,7 @@ async fn main(spawner: Spawner) {
         let mut cfg = Config::default();
         cfg.use_program(&common.load_program(&rgb_prog.program), &[&clk]);
         cfg.set_out_pins(&[&r1, &g1, &b1, &r2, &g2, &b2]);
-        cfg.clock_divider = fixed::FixedU32::from_num(2);
+        cfg.clock_divider = fixed::FixedU32::from_num(1);
         cfg.shift_out.direction = ShiftDirection::Right;
         cfg.shift_out.auto_fill = true;
         cfg.fifo_join = FifoJoin::TxOnly;
@@ -138,6 +236,8 @@ async fn main(spawner: Spawner) {
 
     sm0.set_config(&cfg);
     sm0.set_pin_dirs(Direction::Out, &[&r1, &g1, &b1, &r2, &g2, &b2, &clk]);
+    sm0.set_enable(true);
+    sm0.tx().push(W as u32 - 1);
 
     let row_prog = pio::pio_asm!(
         ".side_set 1",
@@ -170,7 +270,9 @@ async fn main(spawner: Spawner) {
 
     sm1.set_config(&cfg);
     sm1.set_pin_dirs(Direction::Out, &[&a, &b, &c, &d, &lat]);
-
+    sm1.set_enable(true);
+    sm1.tx().push(H as u32 / 2 - 1);
+    sm1.tx().push(B as u32 - 1);
 
     let delay_prog = pio::pio_asm!(
         ".side_set 1",
@@ -194,6 +296,7 @@ async fn main(spawner: Spawner) {
 
     sm2.set_config(&cfg);
     sm2.set_pin_dirs(Direction::Out, &[&oe]);
+    sm2.set_enable(true);
 
     let mut fb_ch = p.DMA_CH0.into_ref();
     let mut fb_loop_ch = p.DMA_CH1.into_ref();
@@ -222,7 +325,7 @@ async fn main(spawner: Spawner) {
     fb_ch
         .regs()
         .write_addr()
-        .write(|c| pac::PIO0.as_ptr() as u32 + 0x10);
+        .write(|c| *c = pac::PIO0.txf(0).as_ptr() as u32);
 
     fb_loop_ch.regs().al1_ctrl().write(|c| {
         let mut t = CtrlTrig(*c);
@@ -268,7 +371,7 @@ async fn main(spawner: Spawner) {
     oe_ch
         .regs()
         .write_addr()
-        .write(|c| *c = pac::PIO0.as_ptr() as u32 + 0x10 + (2 * 4));
+        .write(|c| *c = pac::PIO0.txf(2).as_ptr() as u32);
 
     oe_loop_ch.regs().al1_ctrl().write(|c| {
         let mut t = CtrlTrig(*c);
@@ -297,26 +400,14 @@ async fn main(spawner: Spawner) {
         .al2_write_addr_trig()
         .write(|c| *c = oe_ch.regs().read_addr().as_ptr() as u32);
 
-    sm0.restart();
-    sm1.restart();
-    sm2.restart();
-
-    sm0.tx().push(64 - 1);
-    sm1.tx().push(32 / 2 - 1);
-    sm1.tx().push(8 - 1);
-    info!("{}", sm0.get_addr());
-
+    let mut i: u32 = 0;
     loop {
-        if dm.fbptr[0] == dm.fb0.as_ptr() as u32 {
-            dm.fbptr[0] = dm.fb1.as_ptr() as u32;
-        } else {
-            dm.fbptr[0] = dm.fb0.as_ptr() as u32;
-        }
-        // while !fb_loop_ch.regs().ctrl_trig().read().busy() {}
+	i = (i + 1) % W as u32;
+        Circle::new(Point::new(i as i32, 10), 30)
+            .draw_styled(&PrimitiveStyle::with_fill(Rgb555::WHITE), &mut dm)
+            .unwrap();
 
-        info!("{}", sm0.get_addr());
-        info!("{}", sm1.get_addr());
-        info!("{}", sm2.get_addr());
-        Timer::after_millis(100).await;
+        dm.swap_buffers(&fb_loop_ch);
+	Timer::after_millis(50).await;
     }
 }
