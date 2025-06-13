@@ -27,7 +27,7 @@ use embedded_graphics::prelude::*;
 use embedded_graphics::primitives::{Circle, PrimitiveStyle, StyledDrawable};
 use fixed::FixedU32;
 use fixed::types::extra::U8;
-use lut::{Identity, Lut};
+use lut::{GammaLut, Identity, Lut};
 use pio::{ProgramWithDefines, pio_asm};
 use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
@@ -181,9 +181,12 @@ async fn main(spawner: Spawner) {
 
     let lut = Identity;
 
+
     const W: usize = 64;
     const H: usize = 32;
     const B: usize = 8;
+
+    let lut: GammaLut<B, Rgb888, _> = GammaLut::new().init((1.0, 1.0, 1.0));
 
     let mut dm: DisplayMemory<W, H, B, Rgb888> = DisplayMemory::new(&lut);
 
