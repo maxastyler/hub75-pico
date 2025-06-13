@@ -12,7 +12,7 @@ cyw43-pio = { version = "0.4.0", features = ["defmt"] }
 defmt = "1.0.1"
 defmt-rtt = "1.0.0"
 embassy-embedded-hal = { version = "0.3.0", features = ["defmt"] }
-embassy-executor = { version = "0.7.0", features = ["arch-cortex-m", "executor-thread", "executor-interrupt", "defmt"] }
+embassy-executor = { version = "0.7.0", features = ["arch-cortex-m", "executor-thread", "executor-interrupt", "defmt", "task-arena-size-24576"] }
 embassy-net = { version = "0.7.0", features = ["defmt", "tcp", "udp", "raw", "dhcpv4", "medium-ethernet", "dns"] }
 embassy-rp = { version = "0.4.0", features = ["binary-info", "critical-section-impl", "defmt", "rp235xa", "time-driver", "unstable-pac"] }
 embassy-sync = { version = "0.7.0", features = ["defmt"] }
