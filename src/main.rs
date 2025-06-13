@@ -181,7 +181,6 @@ async fn main(spawner: Spawner) {
 
     let lut = Identity;
 
-
     const W: usize = 64;
     const H: usize = 32;
     const B: usize = 8;
@@ -409,8 +408,8 @@ async fn main(spawner: Spawner) {
     let mut t: f32 = 0.0;
     let mut instant = embassy_time::Instant::now();
     loop {
-        let i: i32 = (W/2) as i32 + (20.0*libm::sinf(3.0 * t)) as i32;
-        let j: i32 = (H/2) as i32 + (20.0*libm::cosf(2.1 * t)) as i32;
+        let i: i32 = (W / 2) as i32 + (20.0 * libm::sinf(3.0 * t)) as i32;
+        let j: i32 = (H / 2) as i32 + (20.0 * libm::cosf(2.1 * t)) as i32;
         Circle::with_center(Point::new(i as i32, j as i32), 30)
             .draw_styled(&PrimitiveStyle::with_fill(Rgb888::WHITE), &mut dm)
             .unwrap();
@@ -423,15 +422,11 @@ async fn main(spawner: Spawner) {
         Circle::with_center(Point::new(i as i32 - 4, j as i32 - 4), 10)
             .draw_styled(&PrimitiveStyle::with_fill(Rgb888::BLUE), &mut dm)
             .unwrap();
-        for i in 0..100 {
-            Circle::with_center(Point::new(i*3 as i32, j + i), 2)
-                .draw_styled(&PrimitiveStyle::with_fill(Rgb888::CSS_PINK), &mut dm)
-                .unwrap();
-        }
+
         dm.swap_buffers(&fb_loop_ch);
-	Timer::after_millis(1).await;
-	let new = embassy_time::Instant::now();
+        Timer::after_millis(1).await;
+        let new = embassy_time::Instant::now();
         t += ((new - instant).as_millis() as f32) / 1000.0;
-	instant = new;
+        instant = new;
     }
 }
