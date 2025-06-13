@@ -174,7 +174,7 @@ fn setup_framebuffer_channel<const W: usize, const H: usize, FB_CH: Channel, FB_
     fb_channel: PeripheralRef<'_, FB_CH>,
     fb_loop_channel: PeripheralRef<'_, FB_L_CH>,
     pio_dreq_sel: TreqSel,
-    framebuffer: &[u8; fb_bytes(W, H, 8)],
+    framebuffer: *const [u8; fb_bytes(W, H, 8)],
     rgb_state_machine_tx_register: &Reg<u32, RW>,
 ) {
     fb_channel.regs().al1_ctrl().write(|c| {
@@ -192,7 +192,7 @@ fn setup_framebuffer_channel<const W: usize, const H: usize, FB_CH: Channel, FB_
     fb_channel
         .regs()
         .read_addr()
-        .write(|c| *c = framebuffer.as_ptr() as u32);
+        .write(|c| *c = framebuffer as u32);
     fb_channel
         .regs()
         .trans_count()
@@ -299,9 +299,9 @@ fn setup_oe_loop_channel<const W: usize, const H: usize, OE_CH: Channel, OE_L_CH
         .write(|c| *c = oe_channel.regs().read_addr().as_ptr() as u32);
 }
 
-struct Display<'a, const W: usize, const H: usize, FB_CH, FB_L_CH, OE_CH, OE_L_CH> {
-    brightness: u8,
-    lut: &'a dyn Lut,
+pub struct Display<'a, const W: usize, const H: usize, FB_CH, FB_L_CH, OE_CH, OE_L_CH> {
+    pub brightness: u8,
+    pub lut: &'a dyn Lut,
     peripherals: DisplayPeripherals<'a, PIO0, FB_CH, FB_L_CH, OE_CH, OE_L_CH>,
     ptr_to_framebuffer: &'static mut *const [u8],
 }
@@ -317,7 +317,7 @@ where
     pub fn new(
         lut: &'a impl Lut,
         pio: Pio<'a, PIO0>,
-        frame_buffer: &'a [u8; fb_bytes(W, H, 8)],
+        frame_buffer: *const [u8; fb_bytes(W, H, 8)],
         r1: impl Peripheral<P = impl PioPin + 'a> + 'a,
         g1: impl Peripheral<P = impl PioPin + 'a> + 'a,
         b1: impl Peripheral<P = impl PioPin + 'a> + 'a,
@@ -425,16 +425,16 @@ where
         }
     }
 
-    fn set_new_framebuffer(&mut self, frame_buffer: &'a [u8; fb_bytes(W, H, 8)]) {
-        while !self
-            .peripherals
-            .fb_loop_channel
-            .regs()
-            .ctrl_trig()
-            .read()
-            .busy()
-        {
-            spin_loop()
-        }
+    pub fn set_new_framebuffer(&mut self, frame_buffer: *const [u8; fb_bytes(W, H, 8)]) {
+        *self.ptr_to_framebuffer = frame_buffer;
+        // while !self
+        //     .peripherals
+        //     .fb_loop_channel
+        //     .regs()
+        //     .ctrl_trig()
+        //     .read()
+        //     .busy()
+
+        // {}
     }
 }
