@@ -4,8 +4,11 @@
 #![no_main]
 #![feature(generic_const_exprs)]
 
+use core::pin::pin;
+
 use defmt::*;
 use embassy_executor::{Executor, Spawner};
+use embassy_futures::yield_now;
 use embassy_rp::dma::Channel;
 use embassy_rp::gpio::{Level, Output, Pin};
 use embassy_rp::multicore::{Stack, spawn_core1};
@@ -48,23 +51,24 @@ async fn main(spawner: Spawner) {
 
     let lut: GammaLut<_> = GammaLut::new().init((1.0, 1.0, 1.0));
 
-    let mut fb_bytes_1 = [0u8; fb_bytes(W, H, B)];
-    let mut fb_bytes_2 = [0u8; fb_bytes(W, H, B)];
+    let mut fb_bytes_1 = pin!([0u8; fb_bytes(W, H, B)]);
+    let mut fb_bytes_2 = pin!([0u8; fb_bytes(W, H, B)]);
 
-    // let comms = Comms::<10>::new(
-    //     spawner,
-    //     p.PIN_23,
-    //     p.PIN_25,
-    //     p.PIN_24,
-    //     p.PIN_29,
-    //     p.DMA_CH6,
-    //     Pio::new(p.PIO1, Irqs),
-    // ).await;
+    let comms = Comms::<10>::new(
+        spawner,
+        p.PIN_23,
+        p.PIN_25,
+        p.PIN_24,
+        p.PIN_29,
+        p.DMA_CH6,
+        Pio::new(p.PIO1, Irqs),
+    )
+    .await;
 
     let mut display: Display<64, 32, _, _, _, _> = Display::new(
         &lut,
         Pio::new(p.PIO0, Irqs),
-        &fb_bytes_1 as *const [u8; fb_bytes(W, H, 8)],
+        fb_bytes_1.as_ptr() as *const [u8; fb_bytes(W, H, 8)],
         p.PIN_0,
         p.PIN_1,
         p.PIN_2,
@@ -95,25 +99,6 @@ async fn main(spawner: Spawner) {
         } else {
             FrameBuffer::new(&mut fb_bytes_1, &display)
         };
-        // Circle::with_center(Point::new(i as i32, j as i32), 60)
-        //     .draw_styled(
-        //         &PrimitiveStyle::with_fill(Rgb888::CSS_ORANGE),
-        //         &mut framebuffer,
-        //     )
-        //     .unwrap();
-        embedded_graphics::primitives::Line::with_delta(Point::new(0, 0), Point::new(100, 100))
-            .draw_styled(
-                &PrimitiveStyle::with_stroke(Rgb888::CSS_PURPLE, 4),
-                &mut framebuffer,
-            )
-            .unwrap();
-
-        embedded_graphics::primitives::Line::with_delta(Point::new(64, 32), Point::new(-100, 100))
-            .draw_styled(
-                &PrimitiveStyle::with_stroke(Rgb888::CSS_PINK, 10),
-                &mut framebuffer,
-            )
-            .unwrap();
 
         Circle::with_center(Point::new(i as i32, j as i32), 30)
             .draw_styled(&PrimitiveStyle::with_fill(Rgb888::WHITE), &mut framebuffer)
@@ -137,13 +122,14 @@ async fn main(spawner: Spawner) {
         t += ((new - instant).as_millis() as f32) / 1000.0;
         instant = new;
         if reading_fb_1 {
-            display.set_new_framebuffer(&fb_bytes_2 as *const [u8; fb_bytes(W, H, 8)]);
+            display.set_new_framebuffer(&*fb_bytes_2 as *const [u8; fb_bytes(W, H, 8)]);
             fb_bytes_1[..].fill(0);
             reading_fb_1 = false;
         } else {
-            display.set_new_framebuffer(&fb_bytes_1 as *const [u8; fb_bytes(W, H, 8)]);
+            display.set_new_framebuffer(&*fb_bytes_1 as *const [u8; fb_bytes(W, H, 8)]);
             fb_bytes_2[..].fill(0);
             reading_fb_1 = true;
         }
+        yield_now().await;
     }
 }

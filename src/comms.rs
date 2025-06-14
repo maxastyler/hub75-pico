@@ -3,7 +3,7 @@ use cyw43::bluetooth::BtDriver;
 use cyw43_pio::{PioSpi, RM2_CLOCK_DIVIDER};
 use defmt::*;
 use embassy_executor::Spawner;
-use embassy_futures::join::join;
+use embassy_futures::{join::join, select::select};
 use embassy_rp::{
     Peripheral,
     dma::Channel,
@@ -12,7 +12,7 @@ use embassy_rp::{
     peripherals::{DMA_CH6, PIO1},
     pio::{Instance as PioInstance, InterruptHandler, Pio, PioPin},
 };
-use embassy_time::{Duration, Timer};
+use embassy_time::{Duration, Timer, with_timeout};
 use static_cell::StaticCell;
 use trouble_host::prelude::*;
 use trouble_host::{Address, Controller, HostResources};
@@ -69,11 +69,15 @@ impl<const N: usize> Comms<N> {
             channel,
         );
 
+        info!("Set up pio spi");
+
         static STATE: StaticCell<cyw43::State> = StaticCell::new();
         let state = STATE.init(cyw43::State::new());
         let (_net_device, bt_device, mut control, runner) =
             cyw43::new_with_bluetooth(state, pwr, spi, fw, btfw).await;
+        info!("Spawning the cyw43 task");
         unwrap!(spawner.spawn(cyw43_task(runner)));
+        info!("Initing the controller");
         control.init(clm).await;
 
         let controller: ExternalController<_, 10> = ExternalController::new(bt_device);
@@ -94,7 +98,9 @@ where
     // Hardcoded peripheral address
     let address: Address = Address::random([0xff, 0x8f, 0x1a, 0x05, 0xe4, 0xff]);
 
-    let mut resources: HostResources<3, CONNECTIONS_MAX, L2CAP_CHANNELS_MAX> = HostResources::new();
+    let mut resources: HostResources<CONNECTIONS_MAX, L2CAP_CHANNELS_MAX, 251, 16> =
+        HostResources::new();
+    info!("Create resources");
     let stack = trouble_host::new(controller, &mut resources).set_random_address(address);
     let Host {
         mut peripheral,
@@ -113,7 +119,7 @@ where
 
     let mut scan_data = [0; 31];
     let scan_data_len = AdStructure::encode_slice(
-        &[AdStructure::CompleteLocalName(b"Trouble")],
+        &[AdStructure::CompleteLocalName(b"Sab's piccy thing")],
         &mut scan_data[..],
     )
     .unwrap();
@@ -141,9 +147,18 @@ where
                 mtu: 256,
                 ..Default::default()
             };
-            let mut ch1 = L2capChannel::accept(&stack, &conn, &[10], &config)
-                .await
-                .unwrap();
+
+            info!("Creating l2cap channel");
+
+            let mut ch1 = match with_timeout(
+                Duration::from_millis(1000),
+                L2capChannel::accept(&stack, &conn, &[10], &config),
+            )
+            .await
+            {
+                Ok(ch_res) => ch_res.unwrap(),
+                Err(_) => continue,
+            };
 
             info!("L2CAP channel accepted");
 

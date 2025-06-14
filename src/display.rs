@@ -302,7 +302,7 @@ fn setup_oe_loop_channel<const W: usize, const H: usize, OE_CH: Channel, OE_L_CH
 pub struct Display<'a, const W: usize, const H: usize, FB_CH, FB_L_CH, OE_CH, OE_L_CH> {
     pub brightness: u8,
     pub lut: &'a dyn Lut,
-    peripherals: DisplayPeripherals<'a, PIO0, FB_CH, FB_L_CH, OE_CH, OE_L_CH>,
+    _peripherals: DisplayPeripherals<'a, PIO0, FB_CH, FB_L_CH, OE_CH, OE_L_CH>,
     ptr_to_framebuffer: &'static mut *const [u8],
 }
 
@@ -410,7 +410,7 @@ where
 
         Display {
             lut,
-            peripherals: DisplayPeripherals {
+            _peripherals: DisplayPeripherals {
                 common,
                 rgb_sm,
                 row_sm,
