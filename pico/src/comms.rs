@@ -127,7 +127,7 @@ where
     info!("Hi");
 
     let _ = join(runner.run(), async {
-        loop {
+        'connect_loop: loop {
             info!("Advertising, waiting for connection...");
             let advertiser = peripheral
                 .advertise(
@@ -166,20 +166,28 @@ where
             const PAYLOAD_LEN: usize = 27;
             let mut rx = [0; PAYLOAD_LEN];
             for i in 0..10 {
-                let len = ch1.receive(&stack, &mut rx).await.unwrap();
-                self::assert_eq!(len, rx.len());
-                self::assert_eq!(rx, [i; PAYLOAD_LEN]);
+                match ch1.receive(&stack, &mut rx).await {
+                    Ok(len) => {
+			info!("Received a payload: {}", rx[..len])
+                    }
+                    Err(_) => {
+                        error!("Got bluetooth error, closing");
+                        ch1.disconnect();
+                        conn.disconnect();
+			continue 'connect_loop
+                    }
+                }
             }
 
             info!("L2CAP data received, echoing");
             Timer::after(Duration::from_secs(1)).await;
             for i in 0..10 {
                 let tx = [i; PAYLOAD_LEN];
-                ch1.send::<C, 20>(&stack, &tx).await.unwrap();
+                ch1.send::<C, 100>(&stack, &tx).await.unwrap();
             }
+	    ch1.disconnect();
+            conn.disconnect();
             info!("L2CAP data echoed");
-
-            Timer::after(Duration::from_secs(60)).await;
         }
     })
     .await;
