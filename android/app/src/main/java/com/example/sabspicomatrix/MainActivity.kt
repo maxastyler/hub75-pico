@@ -23,8 +23,8 @@ import com.example.sabspicomatrix.ui.theme.SabsPicoMatrixTheme
 import com.example.sabspicomatrix.vm.SimpleVM
 import dagger.hilt.android.AndroidEntryPoint
 import android.Manifest
-import android.util.Log
-import com.example.sabspicomatrix.repository.BluetoothState
+import com.example.sabspicomatrix.repository.BluetoothPowerState
+import com.example.sabspicomatrix.repository.Discovery
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -55,23 +55,34 @@ fun Greeting(name: String, modifier: Modifier = Modifier, vm: SimpleVM = viewMod
             vm.update_permissions()
         }
     val permission by vm.hasBluetoothPermission.collectAsStateWithLifecycle(false)
-    val btState by vm.bluetoothState.collectAsStateWithLifecycle()
+    val btState by vm.bluetoothPowerState.collectAsStateWithLifecycle()
     Column {
+        Button(onClick = { vm.start_discovery() }) {
+            Text("start discovery")
+        }
+        Text(
+            when (btState.powerState) {
+                BluetoothPowerState.Unknown -> "unknown"
+                BluetoothPowerState.Off -> "off"
+                BluetoothPowerState.On -> "on"
+                BluetoothPowerState.TurningOff -> "turning off"
+                BluetoothPowerState.TurningOn -> "turning on"
+            }
+        )
+        Text(
+            when (btState.discovery) {
+                Discovery.Finished -> "not discovering"
+                Discovery.Started -> "discovering"
+                Discovery.Unknown -> "discovery unknown"
+            }
+        )
         if (permission) {
             Text(
                 text = "Hello $name!",
                 modifier = modifier
             )
             Text("bluetooth permission: ${permission}")
-            Text(
-                when (btState) {
-                    BluetoothState.Unknown -> "unknown"
-                    BluetoothState.Off -> "off"
-                    BluetoothState.On -> "on"
-                    BluetoothState.TurningOff -> "turning off"
-                    BluetoothState.TurningOn -> "turning on"
-                }
-            )
+
         } else {
             Button(onClick = {
                 launcher.launch(
