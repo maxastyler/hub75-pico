@@ -128,7 +128,7 @@ where
 
     let _ = join(runner.run(), async {
         'connect_loop: loop {
-            info!("Advertising, waiting for connection...");
+            info!("Creating advertiser");
             let advertiser = peripheral
                 .advertise(
                     &Default::default(),
@@ -139,6 +139,7 @@ where
                 )
                 .await
                 .unwrap();
+            info!("Waiting for connection");
             let conn = advertiser.accept().await.unwrap();
 
             info!("Connection established");
@@ -168,13 +169,13 @@ where
             for i in 0..10 {
                 match ch1.receive(&stack, &mut rx).await {
                     Ok(len) => {
-			info!("Received a payload: {}", rx[..len])
+                        info!("Received a payload: {}", rx[..len])
                     }
                     Err(_) => {
                         error!("Got bluetooth error, closing");
                         ch1.disconnect();
                         conn.disconnect();
-			continue 'connect_loop
+                        continue 'connect_loop;
                     }
                 }
             }
@@ -185,7 +186,7 @@ where
                 let tx = [i; PAYLOAD_LEN];
                 ch1.send::<C, 100>(&stack, &tx).await.unwrap();
             }
-	    ch1.disconnect();
+            ch1.disconnect();
             conn.disconnect();
             info!("L2CAP data echoed");
         }

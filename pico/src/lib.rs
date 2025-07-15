@@ -6,6 +6,7 @@ mod comms;
 mod display;
 mod framebuffer;
 mod lut;
+mod visualisation;
 
 pub use comms::Comms;
 pub use display::{Display, fb_bytes};
