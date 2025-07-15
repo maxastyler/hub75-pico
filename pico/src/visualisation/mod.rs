@@ -1,14 +1,15 @@
 use core::pin::pin;
 use core::{convert::Infallible, pin::Pin};
 
+use embassy_futures::yield_now;
+use embassy_sync::blocking_mutex::raw::{CriticalSectionRawMutex, RawMutex};
+use embassy_sync::signal::Signal;
 use embedded_graphics::{pixelcolor::BinaryColor, prelude::DrawTarget};
 use sand_pile::{SandPile, SandpileStateUpdate};
 
-use crate::fb_bytes;
+use crate::FB_BYTES;
 
 mod sand_pile;
-
-const FB_BYTES: usize = fb_bytes(64, 32, 8);
 
 pub trait StateUpdate {}
 
@@ -28,19 +29,22 @@ pub enum CurrentState {
 
 pub struct VisualisationState<'a> {
     current: CurrentState,
-    fb_to_write: Option<Pin<&'a mut [u8; FB_BYTES]>>,
-    fb_to_send: Option<Pin<&'a mut [u8; FB_BYTES]>>,
+    fb_to_write: Option<&'a mut [u8; FB_BYTES]>,
+    fb_to_send: Option<&'a mut [u8; FB_BYTES]>,
 }
 
 impl<'a> VisualisationState<'a> {
-    pub fn new(
-        fb_bytes_1: Pin<&'a mut [u8; FB_BYTES]>,
-        fb_bytes_2: Pin<&'a mut [u8; FB_BYTES]>,
-    ) -> Self {
+    pub fn new(fb_bytes: &'a mut [u8; FB_BYTES]) -> Self {
         VisualisationState {
             current: CurrentState::SandPile(SandPile::new()),
-            fb_to_write: Some(fb_bytes_1),
-            fb_to_send: Some(fb_bytes_2),
+            fb_to_write: Some(fb_bytes),
+            fb_to_send: None,
+        }
+    }
+
+    pub async fn run(&mut self) {
+        loop {
+            yield_now().await;
         }
     }
 }

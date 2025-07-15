@@ -15,6 +15,7 @@ use fixed::FixedU32;
 use fixed::types::extra::U8;
 use static_cell::StaticCell;
 
+use crate::FB_BYTES;
 use crate::lut::Lut;
 
 /// The delays to use for 8 bit numbers
@@ -301,7 +302,7 @@ fn setup_oe_loop_channel<const W: usize, const H: usize, OE_CH: Channel, OE_L_CH
 
 pub struct Display<'a, const W: usize, const H: usize, FB_CH, FB_L_CH, OE_CH, OE_L_CH> {
     pub brightness: u8,
-    pub lut: &'a dyn Lut,
+    pub lut: &'static dyn Lut,
     _peripherals: DisplayPeripherals<'a, PIO0, FB_CH, FB_L_CH, OE_CH, OE_L_CH>,
     ptr_to_framebuffer: &'static mut *const [u8],
 }
@@ -315,9 +316,9 @@ where
     OE_L_CH: Channel,
 {
     pub fn new(
-        lut: &'a impl Lut,
+        lut: &'static impl Lut,
         pio: Pio<'a, PIO0>,
-        frame_buffer: *const [u8; fb_bytes(W, H, 8)],
+        frame_buffer: &'static mut [u8; FB_BYTES],
         r1: impl Peripheral<P = impl PioPin + 'a> + 'a,
         g1: impl Peripheral<P = impl PioPin + 'a> + 'a,
         b1: impl Peripheral<P = impl PioPin + 'a> + 'a,
@@ -385,7 +386,7 @@ where
         let mut oe_channel = oe_channel.into_ref();
         let mut oe_loop_channel = oe_loop_channel.into_ref();
 
-        setup_framebuffer_channel(
+        setup_framebuffer_channel::<64, 32, _, _>(
             fb_channel.reborrow(),
             fb_loop_channel.reborrow(),
             TreqSel::PIO0_TX0,
@@ -425,8 +426,14 @@ where
         }
     }
 
-    pub fn set_new_framebuffer(&mut self, frame_buffer: *const [u8; fb_bytes(W, H, 8)]) {
-        *self.ptr_to_framebuffer = frame_buffer;
+    pub fn set_new_framebuffer(
+        &mut self,
+        frame_buffer: &'static mut [u8; FB_BYTES],
+    ) -> &'static mut [u8; FB_BYTES] {
+        let current_ptr: *mut [u8; FB_BYTES] = *self.ptr_to_framebuffer as *mut [u8; FB_BYTES];
+        let output_ref: &'static mut [u8; FB_BYTES] = unsafe { current_ptr.as_mut() }.unwrap();
+        *self.ptr_to_framebuffer = frame_buffer as *const [u8];
+        output_ref
         // while !self
         //     .peripherals
         //     .fb_loop_channel

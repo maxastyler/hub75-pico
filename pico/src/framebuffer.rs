@@ -1,5 +1,9 @@
 use embassy_rp::dma::Channel;
-use embedded_graphics::{pixelcolor::Rgb888, prelude::{DrawTarget, OriginDimensions, Size}, Pixel};
+use embedded_graphics::{
+    Pixel,
+    pixelcolor::Rgb888,
+    prelude::{DrawTarget, OriginDimensions, Size},
+};
 
 use crate::{Display, fb_bytes};
 
