@@ -34,10 +34,6 @@ use pio::{ProgramWithDefines, pio_asm};
 use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
 
-static CORE_1_STACK: StaticCell<Stack<4096>> = StaticCell::new();
-static EXECUTOR0: StaticCell<Executor> = StaticCell::new();
-static EXECUTOR1: StaticCell<Executor> = StaticCell::new();
-
 use hub75_pico::{Comms, Display, FrameBuffer, GammaLut, fb_bytes};
 
 bind_interrupts!(struct Irqs {
@@ -45,8 +41,11 @@ bind_interrupts!(struct Irqs {
     PIO1_IRQ_0 => PioInterruptHandler<PIO1>;
 });
 
-#[embassy_executor::task]
-async fn comms_runner(spawner: Spawner, p: embassy_rp::Peripherals) {
+
+#[embassy_executor::main]
+async fn main(spawner: Spawner) {
+    let p = embassy_rp::init(Default::default());
+
     const W: usize = 64;
     const H: usize = 32;
     const B: usize = 8;
@@ -134,21 +133,4 @@ async fn comms_runner(spawner: Spawner, p: embassy_rp::Peripherals) {
         }
         yield_now().await;
     }
-}
-
-#[cortex_m_rt::entry]
-fn main() -> ! {
-    let p = embassy_rp::init(Default::default());
-
-    spawn_core1(
-        unsafe { p.CORE1.clone_unchecked() },
-        CORE_1_STACK.init_with(|| Stack::new()),
-        move || {
-            let executor1 = EXECUTOR1.init(Executor::new());
-            executor1.run(|spawner| {});
-        },
-    );
-
-    let executor0 = EXECUTOR0.init(Executor::new());
-    executor0.run(move |spawner| unwrap!(spawner.spawn(comms_runner(spawner, p))));
 }

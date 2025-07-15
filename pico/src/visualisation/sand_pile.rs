@@ -19,7 +19,9 @@ where
     }
 }
 
-pub enum SandpileStateUpdate {}
+pub enum SandpileStateUpdate {
+    Reset,
+}
 
 impl StateUpdate for SandpileStateUpdate {}
 
