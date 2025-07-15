@@ -31,13 +31,13 @@ where
 {
     type StateUpdate = SandpileStateUpdate;
 
-    fn update(&mut self, delta_time: embassy_time::Duration) {
+    fn update(&mut self, delta_time: embassy_time::Duration) -> bool {
         todo!()
     }
 
     fn draw<
         D: embedded_graphics::prelude::DrawTarget<
-                Color = embedded_graphics::pixelcolor::BinaryColor,
+                Color = embedded_graphics::pixelcolor::Rgb888,
                 Error = core::convert::Infallible,
             >,
     >(

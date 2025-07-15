@@ -14,3 +14,4 @@ pub use comms::Comms;
 pub use display::{Display, fb_bytes};
 pub use framebuffer::FrameBuffer;
 pub use lut::{GammaLut, Lut, LutState, Init};
+pub use visualisation::VisualisationState;

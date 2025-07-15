@@ -31,7 +31,7 @@ use embedded_graphics::prelude::*;
 use embedded_graphics::primitives::{Circle, PrimitiveStyle, StyledDrawable};
 use fixed::FixedU32;
 use fixed::types::extra::U8;
-use hub75_pico::{Comms, Display, FB_BYTES, FrameBuffer, GammaLut, Init, Lut, fb_bytes};
+use hub75_pico::{fb_bytes, Comms, Display, FrameBuffer, GammaLut, Init, Lut, VisualisationState, FB_BYTES};
 use pio::{ProgramWithDefines, pio_asm};
 use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
@@ -81,12 +81,12 @@ async fn comms_and_display_runner(
     )
     .await;
 
-    let mut current_fb: &'static mut [u8; FB_BYTES] = filled_framebuffer_signal.wait().await;
+    let initial_fb: &'static mut [u8; FB_BYTES] = filled_framebuffer_signal.wait().await;
 
     let mut display: Display<64, 32, _, _, _, _> = Display::new(
         lut,
         Pio::new(p.PIO0, Irqs),
-        current_fb,
+        initial_fb,
         p.PIN_0,
         p.PIN_1,
         p.PIN_2,
@@ -108,13 +108,14 @@ async fn comms_and_display_runner(
 
     loop {
         // if the framebuffer signal is empty, then we can write something to it
-        if !empty_framebuffer_signal.signaled() {
-            if let Some(fb) = filled_framebuffer_signal.try_take() {
-                let buffer = display.set_new_framebuffer(fb);
-                buffer.fill(0);
-                empty_framebuffer_signal.signal(buffer);
-            }
-        }
+	if filled_framebuffer_signal.signaled() {
+	    if !empty_framebuffer_signal.signaled() {
+		let filled_fb = filled_framebuffer_signal.try_take().unwrap();
+		let used_fb = display.set_new_framebuffer(filled_fb);
+                used_fb.fill(0);
+                empty_framebuffer_signal.signal(used_fb);
+	    }
+	}
 
         // let i: i32 = (W / 2) as i32 + (15.0 * libm::sinf(3.0 * t)) as i32;
         // let j: i32 = (H / 2) as i32 + (15.0 * libm::cosf(2.1 * t)) as i32;
@@ -168,6 +169,7 @@ async fn run_visualisation(
     >,
     empty_framebuffer_signal: &'static Signal<CriticalSectionRawMutex, &'static mut [u8; FB_BYTES]>,
 ) {
+    let mut visualisation = VisualisationState::new(filled_framebuffer_signal, empty_framebuffer_signal);
 }
 
 #[cortex_m_rt::entry]

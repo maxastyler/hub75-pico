@@ -5,48 +5,40 @@ use embedded_graphics::{
     prelude::{DrawTarget, OriginDimensions, Size},
 };
 
-use crate::{Display, fb_bytes};
+use crate::{Display, Lut, fb_bytes};
 
-pub struct FrameBuffer<'a, const W: usize, const H: usize, FB_CH, FB_L_CH, OE_CH, OE_L_CH>
+pub struct FrameBuffer<'a, const W: usize, const H: usize>
 where
     [(); fb_bytes(W, H, 8)]: Sized,
-    FB_CH: Channel,
-    FB_L_CH: Channel,
-    OE_CH: Channel,
-    OE_L_CH: Channel,
 {
     data: &'a mut [u8; fb_bytes(W, H, 8)],
-    display: &'a Display<'a, W, H, FB_CH, FB_L_CH, OE_CH, OE_L_CH>,
+    lut: &'static dyn Lut,
+    brightness: u8,
 }
 
-impl<'a, const W: usize, const H: usize, FB_CH, FB_L_CH, OE_CH, OE_L_CH> OriginDimensions
-    for FrameBuffer<'a, W, H, FB_CH, FB_L_CH, OE_CH, OE_L_CH>
+impl<'a, const W: usize, const H: usize> OriginDimensions for FrameBuffer<'a, W, H>
 where
     [(); fb_bytes(W, H, 8)]: Sized,
-    FB_CH: Channel,
-    FB_L_CH: Channel,
-    OE_CH: Channel,
-    OE_L_CH: Channel,
 {
     fn size(&self) -> Size {
         Size::new(W.try_into().unwrap(), H.try_into().unwrap())
     }
 }
 
-impl<'a, const W: usize, const H: usize, FB_CH, FB_L_CH, OE_CH, OE_L_CH>
-    FrameBuffer<'a, W, H, FB_CH, FB_L_CH, OE_CH, OE_L_CH>
+impl<'a, const W: usize, const H: usize> FrameBuffer<'a, W, H>
 where
     [(); fb_bytes(W, H, 8)]: Sized,
-    FB_CH: Channel,
-    FB_L_CH: Channel,
-    OE_CH: Channel,
-    OE_L_CH: Channel,
 {
     pub fn new(
         data: &'a mut [u8; fb_bytes(W, H, 8)],
-        display: &'a Display<'a, W, H, FB_CH, FB_L_CH, OE_CH, OE_L_CH>,
+        lut: &'static impl Lut,
+        brightness: u8,
     ) -> Self {
-        FrameBuffer { data, display }
+        FrameBuffer {
+            data,
+            lut,
+            brightness,
+        }
     }
 
     pub fn set_pixel(&mut self, x: usize, y: usize, color: Rgb888) {
@@ -56,10 +48,10 @@ where
         // Half of the screen
         let h = y > (H / 2) - 1;
         let shift = if h { 3 } else { 0 };
-        let (c_r, c_g, c_b) = self.display.lut.lookup(color);
-        let c_r: u16 = ((c_r as f32) * (self.display.brightness as f32 / 255f32)) as u16;
-        let c_g: u16 = ((c_g as f32) * (self.display.brightness as f32 / 255f32)) as u16;
-        let c_b: u16 = ((c_b as f32) * (self.display.brightness as f32 / 255f32)) as u16;
+        let (c_r, c_g, c_b) = self.lut.lookup(color);
+        let c_r: u16 = ((c_r as f32) * (self.brightness as f32 / 255f32)) as u16;
+        let c_g: u16 = ((c_g as f32) * (self.brightness as f32 / 255f32)) as u16;
+        let c_b: u16 = ((c_b as f32) * (self.brightness as f32 / 255f32)) as u16;
         let base_idx = x + ((y % (H / 2)) * W * 8);
         for b in 0..8 {
             // Extract the n-th bit of each component of the color and pack them
@@ -73,14 +65,9 @@ where
         }
     }
 }
-impl<'a, const W: usize, const H: usize, FB_CH, FB_L_CH, OE_CH, OE_L_CH> DrawTarget
-    for FrameBuffer<'a, W, H, FB_CH, FB_L_CH, OE_CH, OE_L_CH>
+impl<'a, const W: usize, const H: usize> DrawTarget for FrameBuffer<'a, W, H>
 where
     [(); fb_bytes(W, H, 8)]: Sized,
-    FB_CH: Channel,
-    FB_L_CH: Channel,
-    OE_CH: Channel,
-    OE_L_CH: Channel,
 {
     type Color = Rgb888;
 
