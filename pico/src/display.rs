@@ -300,15 +300,24 @@ fn setup_oe_loop_channel<const W: usize, const H: usize, OE_CH: Channel, OE_L_CH
         .write(|c| *c = oe_channel.regs().read_addr().as_ptr() as u32);
 }
 
-pub struct Display<'a, const W: usize, const H: usize, FB_CH, FB_L_CH, OE_CH, OE_L_CH> {
+pub struct Display<
+    'a,
+    const W: usize,
+    const H: usize,
+    PIO: PioInstance,
+    FB_CH,
+    FB_L_CH,
+    OE_CH,
+    OE_L_CH,
+> {
     pub brightness: u8,
     pub lut: &'static dyn Lut,
-    _peripherals: DisplayPeripherals<'a, PIO0, FB_CH, FB_L_CH, OE_CH, OE_L_CH>,
+    _peripherals: DisplayPeripherals<'a, PIO, FB_CH, FB_L_CH, OE_CH, OE_L_CH>,
     ptr_to_framebuffer: &'static mut *const [u8],
 }
 
-impl<'a, const W: usize, const H: usize, FB_CH, FB_L_CH, OE_CH, OE_L_CH>
-    Display<'a, W, H, FB_CH, FB_L_CH, OE_CH, OE_L_CH>
+impl<'a, const W: usize, const H: usize, PIO: PioInstance, FB_CH, FB_L_CH, OE_CH, OE_L_CH>
+    Display<'a, W, H, PIO, FB_CH, FB_L_CH, OE_CH, OE_L_CH>
 where
     FB_CH: Channel,
     FB_L_CH: Channel,
@@ -317,7 +326,7 @@ where
 {
     pub fn new(
         lut: &'static impl Lut,
-        pio: Pio<'a, PIO0>,
+        pio: Pio<'a, PIO>,
         frame_buffer: &'static mut [u8; FB_BYTES],
         r1: impl Peripheral<P = impl PioPin + 'a> + 'a,
         g1: impl Peripheral<P = impl PioPin + 'a> + 'a,

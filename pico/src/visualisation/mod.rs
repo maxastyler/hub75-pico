@@ -1,16 +1,19 @@
 use core::pin::pin;
 use core::{convert::Infallible, pin::Pin};
-
+use defmt::*;
 use embassy_futures::yield_now;
+use embassy_rp::pac::dma::regs::Timer;
 use embassy_sync::blocking_mutex::raw::{CriticalSectionRawMutex, RawMutex};
 use embassy_sync::signal::Signal;
 use embedded_graphics::pixelcolor::Rgb888;
 use embedded_graphics::{pixelcolor::BinaryColor, prelude::DrawTarget};
-use sand_pile::{SandPile, SandpileStateUpdate};
+pub use sand_pile::{SandPile, SandpileStateUpdate};
+pub use test_vis::{TestVis, TestVisUpdate};
 
 use crate::{FB_BYTES, FrameBuffer, Lut};
 
 mod sand_pile;
+mod test_vis;
 
 pub trait StateUpdate {}
 
@@ -23,22 +26,26 @@ pub trait Visualisation {
 
 pub enum CurrentStateUpdate {
     SandPile(SandpileStateUpdate),
+    TestVis(TestVisUpdate),
 }
 
 pub enum CurrentState {
     SandPile(SandPile<32, 64>),
+    TestVis(TestVis),
 }
 
 impl CurrentState {
     pub fn update(&mut self, delta_time: embassy_time::Duration) -> bool {
         match self {
             CurrentState::SandPile(sand_pile) => sand_pile.update(delta_time),
+            CurrentState::TestVis(test_vis) => test_vis.update(delta_time),
         }
     }
 
     pub fn draw<D: DrawTarget<Color = Rgb888, Error = Infallible>>(&mut self, target: &mut D) {
         match self {
             CurrentState::SandPile(sand_pile) => sand_pile.draw(target),
+            CurrentState::TestVis(test_vis) => test_vis.draw(target),
         }
     }
 }
@@ -76,8 +83,10 @@ impl VisualisationState {
                 let empty_framebuffer = self.empty_framebuffer_signal.wait().await;
                 let mut fb: FrameBuffer<64, 32> = FrameBuffer::new(empty_framebuffer, lut, 255);
                 self.current.draw(&mut fb);
+                while self.filled_framebuffer_signal.signaled() {}
+                self.filled_framebuffer_signal.signal(empty_framebuffer);
             }
-	    last_time = new_time;
+            last_time = new_time;
             yield_now().await;
         }
     }
