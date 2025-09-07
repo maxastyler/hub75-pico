@@ -7,7 +7,7 @@ mod display;
 mod display_core;
 mod framebuffer;
 mod lut;
-mod visualisation;
+// mod visualisation;
 
 pub const FB_BYTES: usize = fb_bytes(64, 32, 8);
 
