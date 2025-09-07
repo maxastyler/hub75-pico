@@ -5,9 +5,11 @@
 use core::convert::Infallible;
 use embedded_graphics::pixelcolor::Rgb888;
 use embedded_graphics::prelude::DrawTarget;
+pub use game_of_life::{GameOfLife, GameOfLifeUpdate};
 pub use sand_pile::{RngU32, SandPile, SandpileStateUpdate};
 pub use test_vis::{TestVis, TestVisUpdate};
 
+mod game_of_life;
 mod sand_pile;
 mod test_vis;
 
@@ -23,11 +25,13 @@ pub trait Visualisation {
 pub enum CurrentStateUpdate {
     SandPile(SandpileStateUpdate),
     TestVis(TestVisUpdate),
+    GameOfLife(GameOfLifeUpdate),
 }
 
 pub enum CurrentState {
     SandPile(SandPile<32, 64>),
     TestVis(TestVis),
+    GameOfLife(GameOfLife<64, 32>),
 }
 
 impl CurrentState {
@@ -35,6 +39,7 @@ impl CurrentState {
         match self {
             CurrentState::SandPile(sand_pile) => sand_pile.update(delta_time_us),
             CurrentState::TestVis(test_vis) => test_vis.update(delta_time_us),
+            CurrentState::GameOfLife(s) => s.update(delta_time_us),
         }
     }
 
@@ -42,6 +47,7 @@ impl CurrentState {
         match self {
             CurrentState::SandPile(sand_pile) => sand_pile.draw(target),
             CurrentState::TestVis(test_vis) => test_vis.draw(target),
+            CurrentState::GameOfLife(s) => s.draw(target),
         }
     }
 }

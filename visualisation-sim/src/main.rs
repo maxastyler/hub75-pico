@@ -1,10 +1,11 @@
 #![feature(generic_const_exprs)]
-use std::{convert::Infallible, time::Instant};
+use std::{convert::Infallible, time::{Duration, Instant}};
 
 use eframe::NativeOptions;
 use egui::{CentralPanel, ColorImage, Image, ImageData, TextureHandle, TextureOptions};
 use embedded_graphics::{Pixel, pixelcolor::Rgb888, prelude::RgbColor};
-use visualisation::TestVis;
+use rand::RngCore;
+use visualisation::{GameOfLife, RngU32, SandPile, TestVis};
 
 struct Buffer<const W: usize, const H: usize>
 where
@@ -23,6 +24,14 @@ where
     last_update: Instant,
 }
 
+struct RandU32Rng;
+
+impl RngU32 for RandU32Rng {
+    fn next_u32(&mut self) -> u32 {
+        rand::rng().next_u32()
+    }
+}
+
 impl<const W: usize, const H: usize> App<W, H>
 where
     [(); W * H * 3]: Sized,
@@ -35,8 +44,14 @@ where
             TextureOptions::NEAREST,
         );
 
+        let mut gol = GameOfLife::new();
+        for _ in 0..1000 {
+            let mut r = rand::rng();
+            gol.board_1[(r.next_u32() % (W * H) as u32) as usize] = true;
+        }
+
         App {
-            state: visualisation::CurrentState::TestVis(TestVis::new()),
+            state: visualisation::CurrentState::GameOfLife(gol),
             texture,
             buffer: Buffer { buffer },
             last_update: Instant::now(),
@@ -81,7 +96,7 @@ where
     {
         for Pixel(point, colour) in pixels {
             if (point.x >= 0) & (point.x < W as i32) & (point.y >= 0) & (point.y < H as i32) {
-                let index = (W * 3 * point.y as usize + point.x as usize * 3);
+                let index = (W * point.y as usize + point.x as usize) * 3;
                 self.buffer[index + 0] = colour.r();
                 self.buffer[index + 1] = colour.g();
                 self.buffer[index + 2] = colour.b();
@@ -97,14 +112,16 @@ where
 {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let time_since_last = self.last_update.elapsed();
-        self.last_update = Instant::now();
-        self.state.update(time_since_last.as_micros() as u32);
-        self.clear();
-        self.state.draw(&mut self.buffer);
-        self.blit();
+        if time_since_last > Duration::from_millis(100) {
+            self.last_update = Instant::now();
+            self.state.update(time_since_last.as_micros() as u32);
+            self.clear();
+            self.state.draw(&mut self.buffer);
+            self.blit();
+        }
+
         CentralPanel::default().show(ctx, |ui| {
-            Image::new(&self.texture)
-                .paint_at(ui, ui.max_rect())
+            Image::new(&self.texture).paint_at(ui, ui.max_rect())
         });
         ctx.request_repaint();
     }
