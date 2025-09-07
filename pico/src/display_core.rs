@@ -35,6 +35,7 @@ pub async fn run_display_core<'a, PIO: Instance, FB_CH, FB_L_CH, OE_CH, OE_L_CH>
     OE_CH: Channel,
     OE_L_CH: Channel,
 {
+    frame_buffer_1.fill(0);
     let mut display: Display<64, 32, PIO, _, _, _, _> = Display::new(
         lut,
         pio,
@@ -66,7 +67,9 @@ pub async fn run_display_core<'a, PIO: Instance, FB_CH, FB_L_CH, OE_CH, OE_L_CH>
 
     loop {
         let elapsed = start_time.elapsed();
+        current_framebuffer = display.set_new_framebuffer(current_framebuffer);
         start_time = embassy_time::Instant::now();
+        // state.update(elapsed);
         state.update(Duration::from_millis(0));
         current_framebuffer.fill(0);
         state.draw(&mut FrameBuffer::<64, 32>::new(
@@ -74,8 +77,8 @@ pub async fn run_display_core<'a, PIO: Instance, FB_CH, FB_L_CH, OE_CH, OE_L_CH>
             lut,
             255,
         ));
-        current_framebuffer = display.set_new_framebuffer(current_framebuffer);
-        if let Some(t) = Duration::from_millis(1000 / 60).checked_sub(start_time.elapsed()) {
+
+        if let Some(t) = Duration::from_millis(1000 / 10).checked_sub(start_time.elapsed()) {
             embassy_time::Timer::after(t).await;
         }
     }

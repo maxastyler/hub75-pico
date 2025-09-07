@@ -40,6 +40,14 @@ impl Visualisation for TestVis {
         let i: i32 = (64 / 2) as i32 + (15.0 * libm::sinf(3.0 * self.time)) as i32;
         let j: i32 = (32 / 2) as i32 + (15.0 * libm::cosf(2.1 * self.time)) as i32;
 
+        Circle::with_center(Point::new(0, 0), 30)
+            .draw_styled(&PrimitiveStyle::with_fill(Rgb888::CSS_BROWN), target)
+            .unwrap();
+
+	Circle::with_center(Point::new(0, 32), 30)
+            .draw_styled(&PrimitiveStyle::with_fill(Rgb888::CSS_DARK_GREEN), target)
+            .unwrap();
+
         Circle::with_center(Point::new(i as i32, j as i32), 30)
             .draw_styled(&PrimitiveStyle::with_fill(Rgb888::WHITE), target)
             .unwrap();

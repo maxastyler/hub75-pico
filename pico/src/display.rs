@@ -442,15 +442,15 @@ where
         let current_ptr: *mut [u8; FB_BYTES] = *self.ptr_to_framebuffer as *mut [u8; FB_BYTES];
         let output_ref: &'static mut [u8; FB_BYTES] = unsafe { current_ptr.as_mut() }.unwrap();
         *self.ptr_to_framebuffer = frame_buffer as *const [u8];
-        output_ref
-        // while !self
-        //     .peripherals
-        //     .fb_loop_channel
-        //     .regs()
-        //     .ctrl_trig()
-        //     .read()
-        //     .busy()
 
-        // {}
+        while !self
+            ._peripherals
+            .fb_loop_channel
+            .regs()
+            .ctrl_trig()
+            .read()
+            .busy()
+        {}
+        output_ref
     }
 }

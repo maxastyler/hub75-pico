@@ -41,20 +41,15 @@ use hub75_pico::{
     run_display_core,
 };
 use pio::{ProgramWithDefines, pio_asm};
-use static_cell::StaticCell;
+use static_cell::{ConstStaticCell, StaticCell};
 use {defmt_rtt as _, panic_probe as _};
 
 static CORE_1_STACK: StaticCell<Stack<32768>> = StaticCell::new();
 static EXECUTOR0: StaticCell<Executor> = StaticCell::new();
 static EXECUTOR1: StaticCell<Executor> = StaticCell::new();
 
-static FILLED_FRAMEBUFFER_SIGNAL: StaticCell<Signal<CriticalSectionRawMutex, &mut [u8; FB_BYTES]>> =
-    StaticCell::new();
-static EMPTY_FRAMEBUFFER_SIGNAL: StaticCell<Signal<CriticalSectionRawMutex, &mut [u8; FB_BYTES]>> =
-    StaticCell::new();
-
-static FB_1: StaticCell<[u8; FB_BYTES]> = StaticCell::new();
-static FB_2: StaticCell<[u8; FB_BYTES]> = StaticCell::new();
+static FB_1: ConstStaticCell<[u8; FB_BYTES]> = ConstStaticCell::new([0; FB_BYTES]);
+static FB_2: ConstStaticCell<[u8; FB_BYTES]> = ConstStaticCell::new([0; FB_BYTES]);
 
 static GAMMA_LUT: StaticCell<GammaLut<Init>> = StaticCell::new();
 
@@ -209,32 +204,11 @@ async fn run_display_core_task(
 fn main() -> ! {
     let p = embassy_rp::init(Default::default());
 
-    let filled_framebuffer_signal: &'static Signal<CriticalSectionRawMutex, &mut [u8; FB_BYTES]> =
-        FILLED_FRAMEBUFFER_SIGNAL.init(Signal::new());
-    let empty_framebuffer_signal: &'static Signal<CriticalSectionRawMutex, &mut [u8; FB_BYTES]> =
-        EMPTY_FRAMEBUFFER_SIGNAL.init(Signal::new());
-    let fb_1: &'static mut [u8; FB_BYTES] = FB_1.init([0; FB_BYTES]);
-    let fb_2: &'static mut [u8; FB_BYTES] = FB_2.init([0; FB_BYTES]);
+    let fb_1: &'static mut [u8; FB_BYTES] = FB_1.take();
+    let fb_2: &'static mut [u8; FB_BYTES] = FB_2.take();
     let lut: &'static GammaLut<Init> = GAMMA_LUT.init(GammaLut::new().init((1.0, 1.0, 1.0)));
-    // empty_framebuffer_signal.signal(fb_2);
 
-    // spawn_core1(
-    //     unsafe { p.CORE1.clone_unchecked() },
-    //     CORE_1_STACK.init_with(|| Stack::new()),
-    //     move || {
-    //         let executor1 = EXECUTOR1.init(Executor::new());
-    //         executor1.run(|spawner| {
-    //             unwrap!(spawner.spawn(run_visualisation(
-    //                 filled_framebuffer_signal,
-    //                 empty_framebuffer_signal,
-    //                 lut
-    //             )));
-    //         });
-    //     },
-    // );
-
-    let executor0 = EXECUTOR0.init(Executor::new());
-    // filled_framebuffer_signal.signal(fb_1);
+    let executor0 = EXECUTOR0.init(Executor::new()); // filled_framebuffer_signal.signal(fb_1);
     // executor0.run(move |spawner| {
     //     unwrap!(spawner.spawn(comms_and_display_runner(
     //         spawner,
