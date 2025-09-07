@@ -5,14 +5,14 @@ use defmt::*;
 use embassy_rp::peripherals::TRNG;
 
 mod queue {
-    use core::mem::MaybeUninit;
+    use core::{any, mem::MaybeUninit};
 
     pub struct Queue<T, const N: usize> {
         data: [MaybeUninit<T>; N],
         ptr: usize,
     }
 
-    impl<T: Copy, const N: usize> Queue<T, N> {
+    impl<T: Copy + PartialEq, const N: usize> Queue<T, N> {
         pub fn new() -> Self {
             Self {
                 data: [MaybeUninit::uninit(); N],
@@ -20,9 +20,9 @@ mod queue {
             }
         }
 
-	pub fn len(&self) -> usize {
-	    self.ptr
-	}
+        pub fn len(&self) -> usize {
+            self.ptr
+        }
 
         pub fn push(&mut self, val: T) -> Option<T> {
             if self.ptr < N {
@@ -34,12 +34,25 @@ mod queue {
             }
         }
 
+        pub fn iter(&self) -> impl Iterator<Item = T> {
+            (0..self.ptr).map(|i| unsafe { self.data[i].assume_init() })
+        }
+
+        pub fn push_unique(&mut self, val: T) -> Option<T> {
+            if self.iter().all(|x| x != val) {
+                self.push(val)
+            } else {
+                None
+            }
+        }
+
         pub fn pull(&mut self) -> Option<T> {
             self.ptr = self.ptr.checked_sub(1)?;
             Some(unsafe { self.data[self.ptr].assume_init() })
         }
     }
 }
+use embassy_time::Instant;
 use embedded_graphics::{
     Pixel,
     pixelcolor::Rgb888,
@@ -53,7 +66,9 @@ where
 {
     sand: [u8; R * C],
     queue: Queue<(u8, u8), 2048>,
-    trng: embassy_rp::trng::Trng<'static, TRNG>,
+    row: u8,
+    col: u8,
+    n_updates_per_iteration: usize,
 }
 
 impl<const R: usize, const C: usize> SandPile<R, C>
@@ -64,15 +79,22 @@ where
     where
         [(); R * C]:,
     {
-        let trng = embassy_rp::trng::Trng::new(
+        let mut trng = embassy_rp::trng::Trng::new(
             unsafe { TRNG::steal() },
             Irqs,
             embassy_rp::trng::Config::default(),
         );
+
+        let rn = trng.blocking_next_u32() as usize;
+        let row: u8 = (rn % R) as u8;
+        let col: u8 = ((rn >> 16) % C) as u8;
+
         SandPile {
             sand: [0; R * C],
             queue: Queue::new(),
-            trng,
+            row,
+            col,
+            n_updates_per_iteration: 50,
         }
     }
 
@@ -95,15 +117,18 @@ where
     }
 
     fn update_position(&mut self, row: u8, col: u8) {
-        let pos = self.get_mut(row, col, 0, 0).unwrap().0;
-        *pos = pos.saturating_add(1);
-        while *self.get_mut(row, col, 0, 0).unwrap().0 >= 4 {
-            *self.get_mut(row, col, 0, 0).unwrap().0 -= 4;
-            for (i, j) in [(-1, 0), (1, 0), (0, -1), (0, 1)] {
-                if let Some((pos, index)) = self.get_mut(row, col, i, j) {
-                    *pos = pos.saturating_add(1);
-                    if *pos >= 4 {
-                        self.queue.push(index);
+        loop {
+            let pos = self.get_mut(row, col, 0, 0).unwrap().0;
+            if *pos < 4 {
+                return;
+            } else {
+                *pos = *pos - 4;
+                for (i, j) in [(-1, 0), (1, 0), (0, -1), (0, 1)] {
+                    if let Some((other_pos, index)) = self.get_mut(row, col, i, j) {
+                        *other_pos = *other_pos + 1;
+                        if *other_pos >= 4 {
+                            self.queue.push_unique(index);
+                        }
                     }
                 }
             }
@@ -123,19 +148,18 @@ where
 {
     type StateUpdate = SandpileStateUpdate;
 
-    fn update(&mut self, delta_time: embassy_time::Duration) -> bool {
-        for _ in 0..10 {
-            let rn = self.trng.blocking_next_u32() as usize;
-            let row: u8 = (rn % R) as u8;
-            let col: u8 = ((rn >> 16) % C) as u8;
-            self.update_position(row, col);
-
-	    info!("Queue len: {}", self.queue.len());
+    fn update(&mut self, _delta_time: embassy_time::Duration) -> bool {
+        for _ in 0..self.n_updates_per_iteration {
+            // add to the selected row
+            let pos = self.get_mut(self.row, self.col, 0, 0).unwrap().0;
+            *pos = pos.saturating_add(1);
+            self.queue.push_unique((self.row, self.col));
 
             while let Some((row, col)) = self.queue.pull() {
                 self.update_position(row, col);
             }
         }
+
         true
     }
 
@@ -156,9 +180,9 @@ where
                     .map(|((r, c), p)| {
                         let colour = match p {
                             0 => Rgb888::BLACK,
-                            1 => Rgb888::GREEN,
+                            1 => Rgb888::WHITE,
                             2 => Rgb888::RED,
-                            3 => Rgb888::YELLOW,
+                            3 => Rgb888::BLUE,
                             _ => Rgb888::CSS_HOT_PINK,
                         };
                         Pixel(Point::new(c as i32, r as i32), colour)

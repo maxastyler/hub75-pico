@@ -59,7 +59,8 @@ pub async fn run_display_core<'a, PIO: Instance, L: Lut+Copy, FB_CH, FB_L_CH, OE
         oe_loop_channel,
     );
 
-    let mut state = CurrentState::TestVis(TestVis::new());
+    // let mut state = CurrentState::TestVis(TestVis::new());
+    let mut state = CurrentState::SandPile(SandPile::new());    
 
     let mut start_time = embassy_time::Instant::now();
 
