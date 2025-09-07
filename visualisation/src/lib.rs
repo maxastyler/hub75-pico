@@ -5,7 +5,7 @@
 use core::convert::Infallible;
 use embedded_graphics::pixelcolor::Rgb888;
 use embedded_graphics::prelude::DrawTarget;
-pub use sand_pile::{SandPile, SandpileStateUpdate};
+pub use sand_pile::{RngU32, SandPile, SandpileStateUpdate};
 pub use test_vis::{TestVis, TestVisUpdate};
 
 mod sand_pile;

@@ -3,10 +3,32 @@ use embassy_rp::dma::Channel;
 use embassy_rp::pio::{Instance, Pio, PioPin};
 use embassy_time::Duration;
 
-use crate::visualisation::{CurrentState, SandPile, TestVis};
-use crate::{Display, FB_BYTES, FrameBuffer, Lut};
+use crate::{Display, FB_BYTES, FrameBuffer, Irqs, Lut};
+use visualisation::{CurrentState, SandPile, TestVis};
 
-pub async fn run_display_core<'a, PIO: Instance, L: Lut+Copy, FB_CH, FB_L_CH, OE_CH, OE_L_CH>(
+struct Trng<'d> {
+    trng: embassy_rp::trng::Trng<'d, embassy_rp::peripherals::TRNG>,
+}
+
+impl<'d> Trng<'d> {
+    fn new() -> Self {
+        Trng {
+            trng: embassy_rp::trng::Trng::new(
+                unsafe { embassy_rp::peripherals::TRNG::steal() },
+                Irqs,
+                embassy_rp::trng::Config::default(),
+            ),
+        }
+    }
+}
+
+impl<'d> visualisation::RngU32 for Trng<'d> {
+    fn next_u32(&mut self) -> u32 {
+        self.trng.blocking_next_u32()
+    }
+}
+
+pub async fn run_display_core<'a, PIO: Instance, L: Lut + Copy, FB_CH, FB_L_CH, OE_CH, OE_L_CH>(
     frame_buffer_1: *mut [u8; FB_BYTES],
     frame_buffer_2: *mut [u8; FB_BYTES],
     lut: L,
@@ -59,8 +81,7 @@ pub async fn run_display_core<'a, PIO: Instance, L: Lut+Copy, FB_CH, FB_L_CH, OE
         oe_loop_channel,
     );
 
-    // let mut state = CurrentState::TestVis(TestVis::new());
-    let mut state = CurrentState::SandPile(SandPile::new());    
+    let mut state = CurrentState::SandPile(SandPile::new(Trng::new()));
 
     let mut start_time = embassy_time::Instant::now();
 
@@ -71,7 +92,7 @@ pub async fn run_display_core<'a, PIO: Instance, L: Lut+Copy, FB_CH, FB_L_CH, OE
         let mut current_framebuffer = display.get_framebuffer();
         current_framebuffer.fill(0);
         state.draw(&mut current_framebuffer);
-	display.swap_framebuffers();
+        display.swap_framebuffers();
         if let Some(t) = Duration::from_millis(1000 / 60).checked_sub(start_time.elapsed()) {
             embassy_time::Timer::after(t).await;
         }
