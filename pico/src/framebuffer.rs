@@ -7,16 +7,16 @@ use embedded_graphics::{
 
 use crate::{Display, Lut, fb_bytes};
 
-pub struct FrameBuffer<'a, const W: usize, const H: usize>
+pub struct FrameBuffer<'a, const W: usize, const H: usize, Lut>
 where
     [(); fb_bytes(W, H, 8)]: Sized,
 {
     data: &'a mut [u8; fb_bytes(W, H, 8)],
-    lut: &'static dyn Lut,
+    lut: Lut,
     brightness: u8,
 }
 
-impl<'a, const W: usize, const H: usize> OriginDimensions for FrameBuffer<'a, W, H>
+impl<'a, const W: usize, const H: usize, Lut> OriginDimensions for FrameBuffer<'a, W, H, Lut>
 where
     [(); fb_bytes(W, H, 8)]: Sized,
 {
@@ -25,20 +25,20 @@ where
     }
 }
 
-impl<'a, const W: usize, const H: usize> FrameBuffer<'a, W, H>
+impl<'a, const W: usize, const H: usize, L: Lut> FrameBuffer<'a, W, H, L>
 where
     [(); fb_bytes(W, H, 8)]: Sized,
 {
-    pub fn new(
-        data: &'a mut [u8; fb_bytes(W, H, 8)],
-        lut: &'static impl Lut,
-        brightness: u8,
-    ) -> Self {
+    pub fn new(data: &'a mut [u8; fb_bytes(W, H, 8)], lut: L, brightness: u8) -> Self {
         FrameBuffer {
             data,
             lut,
             brightness,
         }
+    }
+
+    pub fn fill(&mut self, value: u8) {
+        self.data.fill(value);
     }
 
     pub fn set_pixel(&mut self, x: usize, y: usize, color: Rgb888) {
@@ -65,7 +65,7 @@ where
         }
     }
 }
-impl<'a, const W: usize, const H: usize> DrawTarget for FrameBuffer<'a, W, H>
+impl<'a, const W: usize, const H: usize, L: Lut> DrawTarget for FrameBuffer<'a, W, H, L>
 where
     [(); fb_bytes(W, H, 8)]: Sized,
 {

@@ -20,7 +20,6 @@ use embassy_rp::{
 };
 pub use framebuffer::FrameBuffer;
 pub use lut::{GammaLut, Init, Lut, LutState};
-pub use visualisation::VisualisationState;
 
 bind_interrupts!(pub struct Irqs {
     PIO0_IRQ_0 => embassy_rp::pio::InterruptHandler<PIO0>;

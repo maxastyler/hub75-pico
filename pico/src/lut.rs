@@ -79,6 +79,12 @@ impl Lut for Identity {
     }
 }
 
+impl<X: Lut> Lut for &X {
+    fn lookup(&self, color: Rgb888) -> (u16, u16, u16) {
+        (**self).lookup(color)
+    }
+}
+
 impl Lut for &dyn Lut {
     fn lookup(&self, color: Rgb888) -> (u16, u16, u16) {
         (&**self).lookup(color)

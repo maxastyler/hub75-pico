@@ -1,5 +1,7 @@
+use core::convert::Infallible;
 use core::hint::spin_loop;
 use core::marker::PhantomData;
+use core::mem::transmute;
 
 use embassy_rp::dma::Channel;
 use embassy_rp::pac::common::{RW, Reg};
@@ -11,12 +13,14 @@ use embassy_rp::pio::{
     ShiftDirection, StateMachine,
 };
 use embassy_rp::{Peripheral, PeripheralRef};
+use embedded_graphics::pixelcolor::Rgb888;
+use embedded_graphics::prelude::{DrawTarget, OriginDimensions, Size};
 use fixed::FixedU32;
 use fixed::types::extra::U8;
 use static_cell::StaticCell;
 
-use crate::FB_BYTES;
 use crate::lut::Lut;
+use crate::{FB_BYTES, FrameBuffer};
 
 /// The delays to use for 8 bit numbers
 const DELAYS_8_BIT: [u32; 8] = delays();
@@ -175,7 +179,7 @@ fn setup_framebuffer_channel<const W: usize, const H: usize, FB_CH: Channel, FB_
     fb_channel: PeripheralRef<'_, FB_CH>,
     fb_loop_channel: PeripheralRef<'_, FB_L_CH>,
     pio_dreq_sel: TreqSel,
-    framebuffer: *const [u8; fb_bytes(W, H, 8)],
+    framebuffer: *const [u8; FB_BYTES],
     rgb_state_machine_tx_register: &Reg<u32, RW>,
 ) {
     fb_channel.regs().al1_ctrl().write(|c| {
@@ -305,19 +309,32 @@ pub struct Display<
     const W: usize,
     const H: usize,
     PIO: PioInstance,
+    L,
     FB_CH,
     FB_L_CH,
     OE_CH,
     OE_L_CH,
 > {
     pub brightness: u8,
-    pub lut: &'static dyn Lut,
+    pub lut: L,
     _peripherals: DisplayPeripherals<'a, PIO, FB_CH, FB_L_CH, OE_CH, OE_L_CH>,
     ptr_to_framebuffer: &'static mut *const [u8],
+    using_frame_buffer_1: bool,
+    frame_buffer_1: *mut [u8; FB_BYTES],
+    frame_buffer_2: *mut [u8; FB_BYTES],
 }
 
-impl<'a, const W: usize, const H: usize, PIO: PioInstance, FB_CH, FB_L_CH, OE_CH, OE_L_CH>
-    Display<'a, W, H, PIO, FB_CH, FB_L_CH, OE_CH, OE_L_CH>
+impl<
+    'a,
+    const W: usize,
+    const H: usize,
+    PIO: PioInstance,
+    L: Lut + Copy,
+    FB_CH,
+    FB_L_CH,
+    OE_CH,
+    OE_L_CH,
+> Display<'a, W, H, PIO, L, FB_CH, FB_L_CH, OE_CH, OE_L_CH>
 where
     FB_CH: Channel,
     FB_L_CH: Channel,
@@ -325,9 +342,10 @@ where
     OE_L_CH: Channel,
 {
     pub fn new(
-        lut: &'static impl Lut,
+        lut: L,
         pio: Pio<'a, PIO>,
-        frame_buffer: &'static mut [u8; FB_BYTES],
+        frame_buffer_1: *mut [u8; FB_BYTES],
+        frame_buffer_2: *mut [u8; FB_BYTES],
         r1: impl Peripheral<P = impl PioPin + 'a> + 'a,
         g1: impl Peripheral<P = impl PioPin + 'a> + 'a,
         b1: impl Peripheral<P = impl PioPin + 'a> + 'a,
@@ -346,7 +364,7 @@ where
         oe_channel: impl Peripheral<P = OE_CH> + 'a,
         oe_loop_channel: impl Peripheral<P = OE_L_CH> + 'a,
     ) -> Self {
-        let ptr_to_framebuffer: &'static mut *const [u8] = PTR_TO_FRAMEBUFFER.init(frame_buffer);
+        let ptr_to_framebuffer: &'static mut *const [u8] = PTR_TO_FRAMEBUFFER.init(frame_buffer_1);
 
         let Pio {
             mut common,
@@ -399,7 +417,7 @@ where
             fb_channel.reborrow(),
             fb_loop_channel.reborrow(),
             TreqSel::PIO0_TX0,
-            frame_buffer,
+            frame_buffer_1,
             &embassy_rp::pac::PIO0.txf(0),
         );
 
@@ -432,25 +450,52 @@ where
             },
             brightness: 255,
             ptr_to_framebuffer,
+            using_frame_buffer_1: true,
+            frame_buffer_1,
+            frame_buffer_2,
         }
     }
 
-    pub fn set_new_framebuffer(
-        &mut self,
-        frame_buffer: &'static mut [u8; FB_BYTES],
-    ) -> &'static mut [u8; FB_BYTES] {
-        let current_ptr: *mut [u8; FB_BYTES] = *self.ptr_to_framebuffer as *mut [u8; FB_BYTES];
-        let output_ref: &'static mut [u8; FB_BYTES] = unsafe { current_ptr.as_mut() }.unwrap();
-        *self.ptr_to_framebuffer = frame_buffer as *const [u8];
+    fn fb_1(&mut self) -> &mut [u8; FB_BYTES] {
+        unsafe { self.frame_buffer_1.as_mut().unwrap_unchecked() }
+    }
 
-        while !self
-            ._peripherals
-            .fb_loop_channel
-            .regs()
-            .ctrl_trig()
-            .read()
-            .busy()
-        {}
-        output_ref
+    fn fb_2(&mut self) -> &mut [u8; FB_BYTES] {
+        unsafe { self.frame_buffer_2.as_mut().unwrap_unchecked() }
+    }
+
+    pub fn swap_framebuffers(&mut self) {
+        if self.using_frame_buffer_1 {
+            *self.ptr_to_framebuffer = self.frame_buffer_2;
+            self.using_frame_buffer_1 = false;
+            self.fb_1().fill(0);
+        } else {
+            *self.ptr_to_framebuffer = self.frame_buffer_1;
+            self.using_frame_buffer_1 = true;
+            self.fb_2().fill(0);
+        }
+
+        // while !self
+        //     ._peripherals
+        //     .fb_loop_channel
+        //     .regs()
+        //     .ctrl_trig()
+        //     .read()
+        //     .busy()
+        // {}
+    }
+
+    pub fn get_framebuffer(&mut self) -> FrameBuffer<'_, W, H, L>
+    where
+        [(); fb_bytes(W, H, 8)]: Sized,
+    {
+        let data = unsafe {
+            transmute(if self.using_frame_buffer_1 {
+                self.fb_2()
+            } else {
+                self.fb_1()
+            })
+        };
+        FrameBuffer::new(data, self.lut, 255)
     }
 }

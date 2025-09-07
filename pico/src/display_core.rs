@@ -6,10 +6,10 @@ use embassy_time::Duration;
 use crate::visualisation::{CurrentState, SandPile, TestVis};
 use crate::{Display, FB_BYTES, FrameBuffer, Lut};
 
-pub async fn run_display_core<'a, PIO: Instance, FB_CH, FB_L_CH, OE_CH, OE_L_CH>(
-    frame_buffer_1: &'static mut [u8; FB_BYTES],
-    frame_buffer_2: &'static mut [u8; FB_BYTES],
-    lut: &'static impl Lut,
+pub async fn run_display_core<'a, PIO: Instance, L: Lut+Copy, FB_CH, FB_L_CH, OE_CH, OE_L_CH>(
+    frame_buffer_1: *mut [u8; FB_BYTES],
+    frame_buffer_2: *mut [u8; FB_BYTES],
+    lut: L,
     pio: Pio<'a, PIO>,
     r1: impl Peripheral<P = impl PioPin + 'a> + 'a,
     g1: impl Peripheral<P = impl PioPin + 'a> + 'a,
@@ -35,11 +35,11 @@ pub async fn run_display_core<'a, PIO: Instance, FB_CH, FB_L_CH, OE_CH, OE_L_CH>
     OE_CH: Channel,
     OE_L_CH: Channel,
 {
-    frame_buffer_1.fill(0);
-    let mut display: Display<64, 32, PIO, _, _, _, _> = Display::new(
+    let mut display: Display<64, 32, PIO, _, _, _, _, _> = Display::new(
         lut,
         pio,
         frame_buffer_1,
+        frame_buffer_2,
         r1,
         g1,
         b1,
@@ -59,26 +59,19 @@ pub async fn run_display_core<'a, PIO: Instance, FB_CH, FB_L_CH, OE_CH, OE_L_CH>
         oe_loop_channel,
     );
 
-    let mut current_framebuffer = frame_buffer_2;
-
     let mut state = CurrentState::TestVis(TestVis::new());
 
     let mut start_time = embassy_time::Instant::now();
 
     loop {
         let elapsed = start_time.elapsed();
-        current_framebuffer = display.set_new_framebuffer(current_framebuffer);
         start_time = embassy_time::Instant::now();
-        // state.update(elapsed);
-        state.update(Duration::from_millis(0));
+        state.update(elapsed);
+        let mut current_framebuffer = display.get_framebuffer();
         current_framebuffer.fill(0);
-        state.draw(&mut FrameBuffer::<64, 32>::new(
-            current_framebuffer,
-            lut,
-            255,
-        ));
-
-        if let Some(t) = Duration::from_millis(1000 / 10).checked_sub(start_time.elapsed()) {
+        state.draw(&mut current_framebuffer);
+	display.swap_framebuffers();
+        if let Some(t) = Duration::from_millis(1000 / 60).checked_sub(start_time.elapsed()) {
             embassy_time::Timer::after(t).await;
         }
     }
