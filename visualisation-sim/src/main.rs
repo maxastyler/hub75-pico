@@ -1,57 +1,76 @@
-use std::convert::Infallible;
+#![feature(generic_const_exprs)]
+use std::{convert::Infallible, time::Instant};
 
 use eframe::NativeOptions;
 use egui::{CentralPanel, ColorImage, Image, ImageData, TextureHandle, TextureOptions};
-use embedded_graphics::{Pixel, pixelcolor::Rgb888};
+use embedded_graphics::{Pixel, pixelcolor::Rgb888, prelude::RgbColor};
+use visualisation::TestVis;
 
-struct App {
-    dimensions: (usize, usize),
-    displaying_t1: bool,
-    t1: TextureHandle,
-    t2: TextureHandle,
+struct Buffer<const W: usize, const H: usize>
+where
+    [(); W * H * 3]: Sized,
+{
+    buffer: [u8; W * H * 3],
 }
 
-impl App {
-    pub fn new(dimensions: (usize, usize), cc: &eframe::CreationContext) -> Self {
-        let t1 = cc.egui_ctx.load_texture(
-            "t1",
-            ColorImage::from_gray(
-                [dimensions.0, dimensions.1],
-                &vec![255; dimensions.0 * dimensions.1],
-            ),
-            TextureOptions::NEAREST,
-        );
-        let t2 = cc.egui_ctx.load_texture(
-            "t2",
-            ColorImage::from_gray(
-                [dimensions.0, dimensions.1],
-                &vec![255; dimensions.0 * dimensions.1],
-            ),
+struct App<const W: usize, const H: usize>
+where
+    [(); W * H * 3]: Sized,
+{
+    state: visualisation::CurrentState,
+    texture: TextureHandle,
+    buffer: Buffer<W, H>,
+    last_update: Instant,
+}
+
+impl<const W: usize, const H: usize> App<W, H>
+where
+    [(); W * H * 3]: Sized,
+{
+    pub fn new(cc: &eframe::CreationContext) -> Self {
+        let buffer = [0; W * H * 3];
+        let texture = cc.egui_ctx.load_texture(
+            "texture",
+            ColorImage::from_rgb([W, H], &buffer),
             TextureOptions::NEAREST,
         );
 
         App {
-            dimensions,
-            displaying_t1: true,
-            t1,
-            t2,
+            state: visualisation::CurrentState::TestVis(TestVis::new()),
+            texture,
+            buffer: Buffer { buffer },
+            last_update: Instant::now(),
         }
+    }
+
+    pub fn clear(&mut self) {
+        self.buffer.buffer.fill(0);
+    }
+
+    pub fn blit(&mut self) {
+        self.texture.set(
+            ColorImage::from_rgb([W, H], &self.buffer.buffer),
+            TextureOptions::NEAREST,
+        );
     }
 }
 
-impl embedded_graphics::geometry::Dimensions for App {
+impl<const W: usize, const H: usize> embedded_graphics::geometry::Dimensions for Buffer<W, H>
+where
+    [(); W * H * 3]: Sized,
+{
     fn bounding_box(&self) -> embedded_graphics::primitives::Rectangle {
         embedded_graphics::primitives::Rectangle::new(
             embedded_graphics::prelude::Point::zero(),
-            embedded_graphics::prelude::Size::new(
-                self.dimensions.0 as u32,
-                self.dimensions.1 as u32,
-            ),
+            embedded_graphics::prelude::Size::new(W as u32, H as u32),
         )
     }
 }
 
-impl embedded_graphics::draw_target::DrawTarget for App {
+impl<const W: usize, const H: usize> embedded_graphics::draw_target::DrawTarget for Buffer<W, H>
+where
+    [(); W * H * 3]: Sized,
+{
     type Color = Rgb888;
 
     type Error = Infallible;
@@ -60,17 +79,34 @@ impl embedded_graphics::draw_target::DrawTarget for App {
     where
         I: IntoIterator<Item = Pixel<Self::Color>>,
     {
-        todo!()
+        for Pixel(point, colour) in pixels {
+            if (point.x >= 0) & (point.x < W as i32) & (point.y >= 0) & (point.y < H as i32) {
+                let index = (W * 3 * point.y as usize + point.x as usize * 3);
+                self.buffer[index + 0] = colour.r();
+                self.buffer[index + 1] = colour.g();
+                self.buffer[index + 2] = colour.b();
+            }
+        }
+        Ok(())
     }
 }
 
-impl eframe::App for App {
+impl<const W: usize, const H: usize> eframe::App for App<W, H>
+where
+    [(); W * H * 3]: Sized,
+{
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        let time_since_last = self.last_update.elapsed();
+        self.last_update = Instant::now();
+        self.state.update(time_since_last.as_micros() as u32);
+        self.clear();
+        self.state.draw(&mut self.buffer);
+        self.blit();
         CentralPanel::default().show(ctx, |ui| {
-            Image::new(&self.t1)
-                .fit_to_original_size(10.0)
+            Image::new(&self.texture)
                 .paint_at(ui, ui.max_rect())
         });
+        ctx.request_repaint();
     }
 }
 
@@ -78,7 +114,7 @@ fn main() {
     eframe::run_native(
         "visualisation sim",
         NativeOptions::default(),
-        Box::new(|cc| Ok(Box::new(App::new((100, 100), cc)))),
+        Box::new(|cc| Ok(Box::new(App::<64, 32>::new(cc)))),
     )
     .unwrap();
 }

@@ -23,8 +23,8 @@ impl TestVis {
 impl Visualisation for TestVis {
     type StateUpdate = TestVisUpdate;
 
-    fn update(&mut self, delta_time: embassy_time::Duration) -> bool {
-        self.time += (delta_time.as_millis() as f32) / 1000.0;
+    fn update(&mut self, delta_time_us: u32) -> bool {
+        self.time += (delta_time_us as f32) / 1000_000.0;
         true
     }
 
@@ -44,7 +44,7 @@ impl Visualisation for TestVis {
             .draw_styled(&PrimitiveStyle::with_fill(Rgb888::CSS_BROWN), target)
             .unwrap();
 
-	Circle::with_center(Point::new(0, 32), 30)
+        Circle::with_center(Point::new(0, 32), 30)
             .draw_styled(&PrimitiveStyle::with_fill(Rgb888::CSS_DARK_GREEN), target)
             .unwrap();
 

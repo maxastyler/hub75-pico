@@ -16,7 +16,7 @@ pub trait StateUpdate {}
 pub trait Visualisation {
     type StateUpdate: StateUpdate;
     /// The update function, returns true if we should draw a new frame
-    fn update(&mut self, delta_time: embassy_time::Duration) -> bool;
+    fn update(&mut self, delta_time_us: u32) -> bool;
     fn draw<D: DrawTarget<Color = Rgb888, Error = Infallible>>(&mut self, target: &mut D);
 }
 
@@ -31,10 +31,10 @@ pub enum CurrentState {
 }
 
 impl CurrentState {
-    pub fn update(&mut self, delta_time: embassy_time::Duration) -> bool {
+    pub fn update(&mut self, delta_time_us: u32) -> bool {
         match self {
-            CurrentState::SandPile(sand_pile) => sand_pile.update(delta_time),
-            CurrentState::TestVis(test_vis) => test_vis.update(delta_time),
+            CurrentState::SandPile(sand_pile) => sand_pile.update(delta_time_us),
+            CurrentState::TestVis(test_vis) => test_vis.update(delta_time_us),
         }
     }
 

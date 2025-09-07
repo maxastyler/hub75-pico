@@ -148,7 +148,7 @@ where
 {
     type StateUpdate = SandpileStateUpdate;
 
-    fn update(&mut self, _delta_time: embassy_time::Duration) -> bool {
+    fn update(&mut self, _delta_time_us: u32) -> bool {
         for _ in 0..self.n_updates_per_iteration {
             // add to the selected row
             let pos = self.get_mut(self.row, self.col, 0, 0).unwrap().0;
