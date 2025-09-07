@@ -21,6 +21,7 @@
             })
             probe-rs
             picotool
+            SDL2
           ];
         };
       });
