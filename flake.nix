@@ -21,8 +21,21 @@
             })
             probe-rs
             picotool
-            SDL2
+
+            xorg.libX11
+            xorg.libXrandr
+            xorg.libXcursor
+            xorg.libXi
+            libxkbcommon
+            libGL
+            fontconfig
+            wayland
+            stdenv.cc.cc.lib
           ];
+
+          LD_LIBRARY_PATH = "${
+              nixpkgs.lib.makeLibraryPath buildInputs
+            }";
         };
       });
 }

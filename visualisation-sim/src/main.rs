@@ -1,40 +1,84 @@
-use embedded_graphics::{
-    pixelcolor::BinaryColor,
-    prelude::*,
-    primitives::{Circle, Line, Rectangle, PrimitiveStyle},
-    mono_font::{ascii::FONT_6X9, MonoTextStyle},
-    text::Text,
-};
-use embedded_graphics_simulator::{BinaryColorTheme, SimulatorDisplay, Window, OutputSettingsBuilder};
+use std::convert::Infallible;
 
-fn main() -> Result<(), core::convert::Infallible> {
-    let mut display = SimulatorDisplay::<BinaryColor>::new(Size::new(128, 64));
+use eframe::NativeOptions;
+use egui::{CentralPanel, ColorImage, Image, ImageData, TextureHandle, TextureOptions};
+use embedded_graphics::{Pixel, pixelcolor::Rgb888};
 
-    let line_style = PrimitiveStyle::with_stroke(BinaryColor::On, 1);
-    let text_style = MonoTextStyle::new(&FONT_6X9, BinaryColor::On);
+struct App {
+    dimensions: (usize, usize),
+    displaying_t1: bool,
+    t1: TextureHandle,
+    t2: TextureHandle,
+}
 
-    Circle::new(Point::new(72, 8), 48)
-        .into_styled(line_style)
-        .draw(&mut display)?;
+impl App {
+    pub fn new(dimensions: (usize, usize), cc: &eframe::CreationContext) -> Self {
+        let t1 = cc.egui_ctx.load_texture(
+            "t1",
+            ColorImage::from_gray(
+                [dimensions.0, dimensions.1],
+                &vec![255; dimensions.0 * dimensions.1],
+            ),
+            TextureOptions::NEAREST,
+        );
+        let t2 = cc.egui_ctx.load_texture(
+            "t2",
+            ColorImage::from_gray(
+                [dimensions.0, dimensions.1],
+                &vec![255; dimensions.0 * dimensions.1],
+            ),
+            TextureOptions::NEAREST,
+        );
 
-    Line::new(Point::new(48, 16), Point::new(8, 16))
-        .into_styled(line_style)
-        .draw(&mut display)?;
+        App {
+            dimensions,
+            displaying_t1: true,
+            t1,
+            t2,
+        }
+    }
+}
 
-    Line::new(Point::new(48, 16), Point::new(64, 32))
-        .into_styled(line_style)
-        .draw(&mut display)?;
+impl embedded_graphics::geometry::Dimensions for App {
+    fn bounding_box(&self) -> embedded_graphics::primitives::Rectangle {
+        embedded_graphics::primitives::Rectangle::new(
+            embedded_graphics::prelude::Point::zero(),
+            embedded_graphics::prelude::Size::new(
+                self.dimensions.0 as u32,
+                self.dimensions.1 as u32,
+            ),
+        )
+    }
+}
 
-    Rectangle::new(Point::new(79, 15), Size::new(34, 34))
-        .into_styled(line_style)
-        .draw(&mut display)?;
+impl embedded_graphics::draw_target::DrawTarget for App {
+    type Color = Rgb888;
 
-    Text::new("Hello World!", Point::new(5, 5), text_style).draw(&mut display)?;
+    type Error = Infallible;
 
-    let output_settings = OutputSettingsBuilder::new()
-        .theme(BinaryColorTheme::OledBlue)
-        .build();
-    Window::new("Hello World", &output_settings).show_static(&display);
+    fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error>
+    where
+        I: IntoIterator<Item = Pixel<Self::Color>>,
+    {
+        todo!()
+    }
+}
 
-    Ok(())
+impl eframe::App for App {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        CentralPanel::default().show(ctx, |ui| {
+            Image::new(&self.t1)
+                .fit_to_original_size(10.0)
+                .paint_at(ui, ui.max_rect())
+        });
+    }
+}
+
+fn main() {
+    eframe::run_native(
+        "visualisation sim",
+        NativeOptions::default(),
+        Box::new(|cc| Ok(Box::new(App::new((100, 100), cc)))),
+    )
+    .unwrap();
 }
