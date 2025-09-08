@@ -1,3 +1,5 @@
+use crate::RngU32;
+
 use super::{StateUpdate, Visualisation};
 
 mod queue {
@@ -16,7 +18,7 @@ mod queue {
             }
         }
 
-	#[allow(dead_code)]
+        #[allow(dead_code)]
         pub fn len(&self) -> usize {
             self.ptr
         }
@@ -67,10 +69,6 @@ where
     n_updates_per_iteration: usize,
 }
 
-pub trait RngU32 {
-    fn next_u32(&mut self) -> u32;
-}
-
 impl<const R: usize, const C: usize> SandPile<R, C>
 where
     [(); R * C]:,
@@ -79,12 +77,6 @@ where
     where
         [(); R * C]:,
     {
-        // let mut trng = embassy_rp::trng::Trng::new(
-        //     unsafe { TRNG::steal() },
-        //     Irqs,
-        //     embassy_rp::trng::Config::default(),
-        // );
-
         let rn = rng.next_u32() as usize;
         let row: u8 = (rn % R) as u8;
         let col: u8 = ((rn >> 16) % C) as u8;

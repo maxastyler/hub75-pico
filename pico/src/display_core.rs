@@ -4,7 +4,7 @@ use embassy_rp::pio::{Instance, Pio, PioPin};
 use embassy_time::Duration;
 
 use crate::{Display, FB_BYTES, FrameBuffer, Irqs, Lut};
-use visualisation::{CurrentState, SandPile, TestVis};
+use visualisation::{CurrentState, GameOfLife, SandPile, TestVis};
 
 struct Trng<'d> {
     trng: embassy_rp::trng::Trng<'d, embassy_rp::peripherals::TRNG>,
@@ -81,14 +81,14 @@ pub async fn run_display_core<'a, PIO: Instance, L: Lut + Copy, FB_CH, FB_L_CH, 
         oe_loop_channel,
     );
 
-    let mut state = CurrentState::SandPile(SandPile::new(Trng::new()));
+    let mut state = CurrentState::GameOfLife(GameOfLife::new_with_random(1000, Trng::new()));
 
     let mut start_time = embassy_time::Instant::now();
 
     loop {
         let elapsed = start_time.elapsed();
         start_time = embassy_time::Instant::now();
-        state.update(elapsed);
+        state.update(elapsed.as_micros() as u32);
         let mut current_framebuffer = display.get_framebuffer();
         current_framebuffer.fill(0);
         state.draw(&mut current_framebuffer);

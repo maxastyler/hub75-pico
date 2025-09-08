@@ -4,7 +4,7 @@ use embedded_graphics::{
     prelude::{Point, RgbColor},
 };
 
-use crate::{StateUpdate, Visualisation};
+use crate::{RngU32, StateUpdate, Visualisation};
 
 pub struct GameOfLife<const W: usize, const H: usize>
 where
@@ -25,6 +25,16 @@ where
             board_2: [false; W * H],
             board_1_current: true,
         }
+    }
+
+    pub fn new_with_random<Rng: RngU32>(n: usize, mut rng: Rng) -> Self {
+        let mut this = Self::new();
+
+        for _ in 0..n {
+            this.board_1[(rng.next_u32() % (W * H) as u32) as usize] = true;
+        }
+
+        this
     }
 
     fn get_read_and_write(&mut self) -> (&mut [bool; W * H], &[bool; W * H]) {
@@ -52,8 +62,8 @@ where
                     (0, -1),
                     (1, -1),
                 ] {
-                    let px = x + dx;
-                    let py = y + dy;
+                    let px = (x + dx) as i32;
+                    let py = (y + dy) as i32;
                     if (px >= 0) & (px < W as i32) & (py >= 0) & (py < H as i32) {
                         let index = px + W as i32 * py;
                         if read[index as usize] {

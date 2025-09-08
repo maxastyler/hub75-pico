@@ -6,12 +6,17 @@ use core::convert::Infallible;
 use embedded_graphics::pixelcolor::Rgb888;
 use embedded_graphics::prelude::DrawTarget;
 pub use game_of_life::{GameOfLife, GameOfLifeUpdate};
-pub use sand_pile::{RngU32, SandPile, SandpileStateUpdate};
+pub use sand_pile::{SandPile, SandpileStateUpdate};
 pub use test_vis::{TestVis, TestVisUpdate};
 
 mod game_of_life;
 mod sand_pile;
 mod test_vis;
+mod grid;
+
+pub trait RngU32 {
+    fn next_u32(&mut self) -> u32;
+}
 
 pub trait StateUpdate {}
 

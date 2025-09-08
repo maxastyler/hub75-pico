@@ -1,5 +1,8 @@
 #![feature(generic_const_exprs)]
-use std::{convert::Infallible, time::{Duration, Instant}};
+use std::{
+    convert::Infallible,
+    time::{Duration, Instant},
+};
 
 use eframe::NativeOptions;
 use egui::{CentralPanel, ColorImage, Image, ImageData, TextureHandle, TextureOptions};
@@ -44,11 +47,7 @@ where
             TextureOptions::NEAREST,
         );
 
-        let mut gol = GameOfLife::new();
-        for _ in 0..1000 {
-            let mut r = rand::rng();
-            gol.board_1[(r.next_u32() % (W * H) as u32) as usize] = true;
-        }
+        let mut gol = GameOfLife::new_with_random(1000, RandU32Rng);
 
         App {
             state: visualisation::CurrentState::GameOfLife(gol),
