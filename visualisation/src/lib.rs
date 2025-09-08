@@ -6,18 +6,25 @@ use core::convert::Infallible;
 use embedded_graphics::pixelcolor::Rgb888;
 use embedded_graphics::prelude::DrawTarget;
 pub use game_of_life::{GameOfLife, GameOfLifeUpdate};
+pub use ising::{Ising, IsingUpdate};
 pub use sand_pile::{SandPile, SandpileStateUpdate};
 pub use test_vis::{TestVis, TestVisUpdate};
 pub use turmite::{Turmite, TurmiteUpdate};
 
 mod game_of_life;
 mod grid;
+mod ising;
 mod sand_pile;
 mod test_vis;
 mod turmite;
 
 pub trait RngU32 {
     fn next_u32(&mut self) -> u32;
+    /// random number between 0 and 1
+    fn unit_f32(&mut self) -> f32 {
+	let n = (self.next_u32() % 100_000) as f32 / 100_000.0;
+	n
+    }
 }
 
 pub trait StateUpdate {}
@@ -34,6 +41,7 @@ pub enum CurrentStateUpdate {
     TestVis(TestVisUpdate),
     GameOfLife(GameOfLifeUpdate),
     Turmite(TurmiteUpdate),
+    Ising(IsingUpdate),
 }
 
 pub enum CurrentState<Rng> {
@@ -41,6 +49,7 @@ pub enum CurrentState<Rng> {
     TestVis(TestVis),
     GameOfLife(GameOfLife<Rng, 64, 32>),
     Turmite(Turmite<64, 32>),
+    Ising(Ising<Rng, 64, 32>),
 }
 
 impl<Rng: RngU32> CurrentState<Rng> {
@@ -50,6 +59,7 @@ impl<Rng: RngU32> CurrentState<Rng> {
             CurrentState::TestVis(test_vis) => test_vis.update(delta_time_us),
             CurrentState::GameOfLife(s) => s.update(delta_time_us),
             CurrentState::Turmite(s) => s.update(delta_time_us),
+            CurrentState::Ising(s) => s.update(delta_time_us),
         }
     }
 
@@ -59,6 +69,7 @@ impl<Rng: RngU32> CurrentState<Rng> {
             CurrentState::TestVis(test_vis) => test_vis.draw(target),
             CurrentState::GameOfLife(s) => s.draw(target),
             CurrentState::Turmite(s) => s.draw(target),
+            CurrentState::Ising(s) => s.draw(target),
         }
     }
 }

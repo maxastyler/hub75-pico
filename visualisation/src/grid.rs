@@ -1,3 +1,5 @@
+use crate::RngU32;
+
 /// A grid of size `(W, H)` containing a value of type `T`
 pub struct Grid<T, const W: usize, const H: usize>
 where
@@ -65,5 +67,12 @@ where
 
     pub fn iter_mut_with_index(&mut self) -> impl Iterator<Item = ((i32, i32), &mut T)> {
         Grid::<T, W, H>::iter_coords().zip(self.buffer.iter_mut())
+    }
+
+    pub fn random_coord<Rng: RngU32>(&mut self, rng: &mut Rng) -> (i32, i32) {
+        let rn = rng.next_u32() as usize;
+        let x = (rn % W) as i32;
+        let y = ((rn >> 16) % H) as i32;
+        (x, y)
     }
 }

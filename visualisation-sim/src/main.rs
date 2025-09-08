@@ -8,7 +8,7 @@ use eframe::NativeOptions;
 use egui::{CentralPanel, ColorImage, Image, ImageData, TextureHandle, TextureOptions};
 use embedded_graphics::{Pixel, pixelcolor::Rgb888, prelude::RgbColor};
 use rand::RngCore;
-use visualisation::{GameOfLife, RngU32, SandPile, TestVis, Turmite};
+use visualisation::{GameOfLife, Ising, RngU32, SandPile, TestVis, Turmite};
 
 struct Buffer<const W: usize, const H: usize>
 where
@@ -49,12 +49,13 @@ where
 
         // let mut gol = GameOfLife::new_with_random(1000, RandU32Rng);
         // let mut sandpile: SandPile<_, 64, 32> = SandPile::new(RandU32Rng);
-	let mut turmite = Turmite::new();
-	turmite.state.x = 32;
-	turmite.state.y = 16;	
+        // let mut turmite = Turmite::new();
+        // turmite.state.x = 32;
+        // turmite.state.y = 16;
+        let mut ising = Ising::new(1.0, RandU32Rng);
 
         App {
-            state: visualisation::CurrentState::Turmite(turmite),
+            state: visualisation::CurrentState::Ising(ising),
             texture,
             buffer: Buffer { buffer },
             last_update: Instant::now(),
