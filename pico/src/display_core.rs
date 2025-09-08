@@ -6,7 +6,7 @@ use embassy_rp::pio::{Instance, Pio, PioPin};
 use embassy_time::Duration;
 
 use crate::{Display, FB_BYTES, Irqs, Lut};
-use visualisation::{CurrentState, SandPile, Turmite};
+use visualisation::{CurrentState, GameOfLife, SandPile, Turmite};
 
 struct Trng<'d> {
     trng: embassy_rp::trng::Trng<'d, embassy_rp::peripherals::TRNG>,
@@ -77,9 +77,9 @@ pub async fn run_display_core<L: Lut + Copy>(
         oe_loop_channel,
     );
 
-    // let mut state = CurrentState::GameOfLife(GameOfLife::new_with_random(1000, Trng::new()));
-    let mut turmite = Turmite::new();
-    let mut state: CurrentState<Trng> = CurrentState::Turmite(turmite);
+    let mut state = CurrentState::GameOfLife(GameOfLife::new_with_random(1000, Trng::new()));
+    // let mut turmite = Turmite::new();
+    // let mut state: CurrentState<Trng> = CurrentState::Turmite(turmite);
     // let mut state: CurrentState<Trng> = CurrentState::SandPile(SandPile::new(Trng::new()));
 
     let mut start_time = embassy_time::Instant::now();
@@ -92,7 +92,7 @@ pub async fn run_display_core<L: Lut + Copy>(
         current_framebuffer.fill(0);
         state.draw(&mut current_framebuffer);
         display.swap_framebuffers();
-        if let Some(t) = Duration::from_millis(1000 / 60).checked_sub(start_time.elapsed()) {
+        if let Some(t) = Duration::from_millis(1).checked_sub(start_time.elapsed()) {
             embassy_time::Timer::after(t).await;
         }
     }

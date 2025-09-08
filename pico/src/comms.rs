@@ -70,7 +70,11 @@ impl<const N: usize> Comms<N> {
         info!("Set up pio spi");
 
         static STATE: StaticCell<cyw43::State> = StaticCell::new();
+        info!("created cell");
+        Timer::after_secs(1).await;
         let state = STATE.init(cyw43::State::new());
+        info!("Got the state");
+        Timer::after_secs(1).await;
         let (_net_device, bt_device, mut control, runner) =
             cyw43::new_with_bluetooth(state, pwr, spi, fw, btfw).await;
         info!("Spawning the cyw43 task");
@@ -94,100 +98,105 @@ where
     C: Controller,
 {
     // Hardcoded peripheral address
-    let address: Address = Address::random([0xff, 0x8f, 0x1a, 0x05, 0xe4, 0xff]);
+    // let address: Address = Address::random([0xff, 0x8f, 0x1a, 0x05, 0xe4, 0xff]);
 
-    let mut resources: HostResources<DefaultPacketPool, CONNECTIONS_MAX, L2CAP_CHANNELS_MAX> =
-        HostResources::new();
-    info!("Create resources");
-    let stack = trouble_host::new(controller, &mut resources).set_random_address(address);
-    let Host {
-        mut peripheral,
-        mut runner,
-        ..
-    } = stack.build();
+    // let mut resources: HostResources<DefaultPacketPool, CONNECTIONS_MAX, L2CAP_CHANNELS_MAX> =
+    //     HostResources::new();
+    // info!("Create resources");
+    // let stack = trouble_host::new(controller, &mut resources).set_random_address(address);
+    // let Host {
+    //     mut peripheral,
+    //     mut runner,
+    //     ..
+    // } = stack.build();
 
-    let mut adv_data = [0; 31];
-    let adv_data_len = AdStructure::encode_slice(
-        &[AdStructure::Flags(
-            LE_GENERAL_DISCOVERABLE | BR_EDR_NOT_SUPPORTED,
-        )],
-        &mut adv_data[..],
-    )
-    .unwrap();
+    // let mut adv_data = [0; 31];
+    // let adv_data_len = AdStructure::encode_slice(
+    //     &[AdStructure::Flags(
+    //         LE_GENERAL_DISCOVERABLE | BR_EDR_NOT_SUPPORTED,
+    //     )],
+    //     &mut adv_data[..],
+    // )
+    // .unwrap();
 
-    let mut scan_data = [0; 31];
-    let scan_data_len = AdStructure::encode_slice(
-        &[AdStructure::CompleteLocalName(b"Sab's piccy thing")],
-        &mut scan_data[..],
-    )
-    .unwrap();
+    // let mut scan_data = [0; 31];
+    // let scan_data_len = AdStructure::encode_slice(
+    //     &[AdStructure::CompleteLocalName(b"Sab's piccy thing")],
+    //     &mut scan_data[..],
+    // )
+    // .unwrap();
 
     info!("Hi");
 
-    let _ = join(runner.run(), async {
-        'connect_loop: loop {
-            info!("Creating advertiser");
-            let advertiser = peripheral
-                .advertise(
-                    &Default::default(),
-                    Advertisement::ConnectableScannableUndirected {
-                        adv_data: &adv_data[..adv_data_len],
-                        scan_data: &scan_data[..scan_data_len],
-                    },
-                )
-                .await
-                .unwrap();
-            info!("Waiting for connection");
-            let conn = advertiser.accept().await.unwrap();
+    loop {
+        Timer::after_secs(1).await;
+        info!("In loop...");
+    }
 
-            info!("Connection established");
+    // let _ = join(runner.run(), async {
+    //     'connect_loop: loop {
+    //         info!("Creating advertiser");
+    //         let advertiser = peripheral
+    //             .advertise(
+    //                 &Default::default(),
+    //                 Advertisement::ConnectableScannableUndirected {
+    //                     adv_data: &adv_data[..adv_data_len],
+    //                     scan_data: &scan_data[..scan_data_len],
+    //                 },
+    //             )
+    //             .await
+    //             .unwrap();
+    //         info!("Waiting for connection");
+    //         let conn = advertiser.accept().await.unwrap();
 
-            let config = L2capChannelConfig {
-                mtu: Some(256),
-                ..Default::default()
-            };
+    //         info!("Connection established");
 
-            info!("Creating l2cap channel");
+    //         let config = L2capChannelConfig {
+    //             mtu: Some(256),
+    //             ..Default::default()
+    //         };
 
-            let mut ch1 = match with_timeout(
-                Duration::from_millis(1000),
-                L2capChannel::accept(&stack, &conn, &[10], &config),
-            )
-            .await
-            {
-                Ok(ch_res) => ch_res.unwrap(),
-                Err(_) => continue,
-            };
+    //         info!("Creating l2cap channel");
 
-            info!("L2CAP channel accepted");
+    //         let mut ch1 = match with_timeout(
+    //             Duration::from_millis(1000),
+    //             L2capChannel::accept(&stack, &conn, &[10], &config),
+    //         )
+    //         .await
+    //         {
+    //             Ok(ch_res) => ch_res.unwrap(),
+    //             Err(_) => continue,
+    //         };
 
-            // Size of payload we're expecting
-            const PAYLOAD_LEN: usize = 27;
-            let mut rx = [0; PAYLOAD_LEN];
-            for _i in 0..10 {
-                match ch1.receive(&stack, &mut rx).await {
-                    Ok(len) => {
-                        info!("Received a payload: {}", rx[..len])
-                    }
-                    Err(_) => {
-                        error!("Got bluetooth error, closing");
-                        ch1.disconnect();
-                        conn.disconnect();
-                        continue 'connect_loop;
-                    }
-                }
-            }
+    //         info!("L2CAP channel accepted");
 
-            info!("L2CAP data received, echoing");
-            Timer::after(Duration::from_secs(1)).await;
-            for i in 0..10 {
-                let tx = [i; PAYLOAD_LEN];
-                ch1.send::<C>(&stack, &tx).await.unwrap();
-            }
-            ch1.disconnect();
-            conn.disconnect();
-            info!("L2CAP data echoed");
-        }
-    })
-    .await;
+    //         // Size of payload we're expecting
+    //         const PAYLOAD_LEN: usize = 27;
+    //         let mut rx = [0; PAYLOAD_LEN];
+    //         for _i in 0..10 {
+    //             match ch1.receive(&stack, &mut rx).await {
+    //                 Ok(len) => {
+    //                     info!("Received a payload: {}", rx[..len])
+    //                 }
+    //                 Err(_) => {
+    //                     error!("Got bluetooth error, closing");
+    //                     ch1.disconnect();
+    //                     conn.disconnect();
+    //                     continue 'connect_loop;
+    //                 }
+    //             }
+    //         }
+
+    //         info!("L2CAP data received, echoing");
+    //         Timer::after(Duration::from_secs(1)).await;
+    //         for i in 0..10 {
+    //             let tx = [i; PAYLOAD_LEN];
+    //             ch1.send::<C>(&stack, &tx).await.unwrap();
+    //         }
+    //         ch1.disconnect();
+    //         conn.disconnect();
+    //         info!("L2CAP data echoed");
+    //     }
+    // })
+    // .await;
 }

@@ -35,7 +35,7 @@ use pio::{ProgramWithDefines, pio_asm};
 use static_cell::{ConstStaticCell, StaticCell};
 use {defmt_rtt as _, panic_probe as _};
 
-static CORE_1_STACK: ConstStaticCell<Stack<100_000>> = ConstStaticCell::new(Stack::new());
+static CORE_1_STACK: ConstStaticCell<Stack<70_000>> = ConstStaticCell::new(Stack::new());
 static EXECUTOR0: StaticCell<Executor> = StaticCell::new();
 static EXECUTOR1: StaticCell<Executor> = StaticCell::new();
 
@@ -155,27 +155,18 @@ fn main() -> ! {
     let mut fb_2: [u8; FB_BYTES] = [0; FB_BYTES];
     let lut: &'static GammaLut<Init> = GAMMA_LUT.init(GammaLut::new().init((1.0, 1.0, 1.0)));
 
-    // let core_1_stack = CORE_1_STACK.take();
+    let core_1_stack = CORE_1_STACK.take();
 
-    // spawn_core1(p.CORE1, core_1_stack, move || {
-    //     let executor1 = EXECUTOR1.init(Executor::new());
-    //     executor1.run(|spawner| {
-    //         spawner.spawn(comms_and_display_runner(spawner, unsafe {
-    //             embassy_rp::Peripherals::steal()
-    //         }));
-    //     });
-    // });
+    spawn_core1(p.CORE1, core_1_stack, move || {
+        let executor1 = EXECUTOR1.init(Executor::new());
+        executor1.run(|spawner| {
+            let _ = spawner.spawn(comms_and_display_runner(spawner, unsafe {
+                embassy_rp::Peripherals::steal()
+            }));
+        });
+    });
 
-    let executor0 = EXECUTOR0.init(Executor::new()); // filled_framebuffer_signal.signal(fb_1);
-    // executor0.run(move |spawner| {
-    //     unwrap!(spawner.spawn(comms_and_display_runner(
-    //         spawner,
-    //         p,
-    //         filled_framebuffer_signal,
-    //         empty_framebuffer_signal,
-    //         lut,
-    //     )))
-    // });
+    let executor0 = EXECUTOR0.init(Executor::new());
 
     executor0.run(move |spawner| {
         unwrap!(spawner.spawn(run_display_core_task(
