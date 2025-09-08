@@ -4,40 +4,38 @@ use embedded_graphics::{
     prelude::{Point, RgbColor},
 };
 
-use crate::{RngU32, StateUpdate, Visualisation};
+use crate::{RngU32, StateUpdate, Visualisation, grid::Grid};
 
-pub struct GameOfLife<const W: usize, const H: usize>
+pub struct GameOfLife<Rng, const W: usize, const H: usize>
 where
-    [(); W * H]: Sized,
+    [(); W * H]:,
 {
-    pub board_1: [bool; W * H],
-    pub board_2: [bool; W * H],
+    pub board_1: Grid<bool, W, H>,
+    pub board_2: Grid<bool, W, H>,
     pub board_1_current: bool,
+    rng: Rng,
 }
 
-impl<const W: usize, const H: usize> GameOfLife<W, H>
+impl<Rng: RngU32, const W: usize, const H: usize> GameOfLife<Rng, W, H>
 where
-    [(); W * H]: Sized,
+    [(); W * H]:,
 {
-    pub fn new() -> Self {
-        GameOfLife {
-            board_1: [false; W * H],
-            board_2: [false; W * H],
+    pub fn new_with_random(n: usize, rng: Rng) -> Self {
+        let mut this = GameOfLife {
+            board_1: Grid::new(false),
+            board_2: Grid::new(false),
             board_1_current: true,
-        }
-    }
-
-    pub fn new_with_random<Rng: RngU32>(n: usize, mut rng: Rng) -> Self {
-        let mut this = Self::new();
+            rng,
+        };
 
         for _ in 0..n {
-            this.board_1[(rng.next_u32() % (W * H) as u32) as usize] = true;
+            this.board_1.buffer_mut()[(this.rng.next_u32() % (W * H) as u32) as usize] = true;
         }
 
         this
     }
 
-    fn get_read_and_write(&mut self) -> (&mut [bool; W * H], &[bool; W * H]) {
+    fn get_read_and_write(&mut self) -> (&mut Grid<bool, W, H>, &Grid<bool, W, H>) {
         if self.board_1_current {
             (&mut self.board_2, &self.board_1)
         } else {
@@ -47,40 +45,33 @@ where
 
     fn step(&mut self) {
         let (write, read) = self.get_read_and_write();
-        for x in 0..W {
-            for y in 0..H {
-                let x = x as i32;
-                let y = y as i32;
-                let mut total: u8 = 0;
-                for (dx, dy) in [
-                    (1, 0),
-                    (1, 1),
-                    (0, 1),
-                    (-1, 1),
-                    (-1, 0),
-                    (-1, -1),
-                    (0, -1),
-                    (1, -1),
-                ] {
-                    let px = (x + dx) as i32;
-                    let py = (y + dy) as i32;
-                    if (px >= 0) & (px < W as i32) & (py >= 0) & (py < H as i32) {
-                        let index = px + W as i32 * py;
-                        if read[index as usize] {
-                            total += 1;
-                        }
-                    }
-                }
-                let index = (x + W as i32 * y) as usize;
-                if (total < 2) | (total > 3) {
-                    write[index] = false;
-                } else if total == 3 {
-                    write[index] = true
-                } else {
-                    write[index] = read[index]
-                }
+        read.iter_with_index().for_each(|((x, y), val)| {
+            let total = [
+                (1, 0),
+                (1, 1),
+                (0, 1),
+                (-1, 1),
+                (-1, 0),
+                (-1, -1),
+                (0, -1),
+                (1, -1),
+            ]
+            .into_iter()
+            .filter_map(|(dx, dy)| match read.get(x + dx, y + dy) {
+                Some(true) => Some(()),
+                _ => None,
+            })
+            .count();
+
+            if (total < 2) | (total > 3) {
+                write.set(x, y, false);
+            } else if total == 3 {
+                write.set(x, y, true);
+            } else {
+                write.set(x, y, *val);
             }
-        }
+        });
+
         self.board_1_current = !self.board_1_current;
     }
 }
@@ -89,9 +80,9 @@ pub struct GameOfLifeUpdate {}
 
 impl StateUpdate for GameOfLifeUpdate {}
 
-impl<const W: usize, const H: usize> Visualisation for GameOfLife<W, H>
+impl<Rng: RngU32, const W: usize, const H: usize> Visualisation for GameOfLife<Rng, W, H>
 where
-    [(); W * H]: Sized,
+    [(); W * H]:,
 {
     type StateUpdate = GameOfLifeUpdate;
 
@@ -115,17 +106,13 @@ where
             &self.board_2
         };
         target
-            .draw_iter(
-                (0..H)
-                    .flat_map(|y| (0..W).map(move |x| (x, y)))
-                    .map(|(x, y)| {
-                        if board[y * W + x] {
-                            Pixel(Point::new(x as i32, y as i32), Rgb888::WHITE)
-                        } else {
-                            Pixel(Point::new(x as i32, y as i32), Rgb888::BLACK)
-                        }
-                    }),
-            )
+            .draw_iter(board.iter_with_index().map(|((x, y), val)| {
+                if *val {
+                    Pixel(Point::new(x as i32, y as i32), Rgb888::WHITE)
+                } else {
+                    Pixel(Point::new(x as i32, y as i32), Rgb888::BLACK)
+                }
+            }))
             .unwrap();
     }
 }

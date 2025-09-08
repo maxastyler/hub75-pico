@@ -1,14 +1,14 @@
 /// A grid of size `(W, H)` containing a value of type `T`
 pub struct Grid<T, const W: usize, const H: usize>
 where
-    [(); W * H]: Sized,
+    [(); W * H]:,
 {
     buffer: [T; W * H],
 }
 
 impl<T: Copy, const W: usize, const H: usize> Grid<T, W, H>
 where
-    [(); W * H]: Sized,
+    [(); W * H]:,
 {
     pub fn new(fill_value: T) -> Self {
         Self {
@@ -19,7 +19,7 @@ where
 
 impl<T, const W: usize, const H: usize> Grid<T, W, H>
 where
-    [(); W * H]: Sized,
+    [(); W * H]:,
 {
     fn x_y_to_index(x: i32, y: i32) -> Option<usize> {
         if (y >= 0) & (y < H as i32) & (x >= 0) & (x < W as i32) {
@@ -53,10 +53,12 @@ where
         }
     }
 
+    /// Iterate over the indices (x, y)
     pub fn iter_coords() -> impl Iterator<Item = (i32, i32)> {
         (0..H as i32).flat_map(|y| (0..W as i32).map(move |x| (x, y)))
     }
 
+    /// Iterate over the values by reference, with indices (x, y) in memory order (x fast, y slow)
     pub fn iter_with_index(&self) -> impl Iterator<Item = ((i32, i32), &T)> {
         Grid::<T, W, H>::iter_coords().zip(self.buffer.iter())
     }

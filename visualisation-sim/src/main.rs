@@ -8,7 +8,7 @@ use eframe::NativeOptions;
 use egui::{CentralPanel, ColorImage, Image, ImageData, TextureHandle, TextureOptions};
 use embedded_graphics::{Pixel, pixelcolor::Rgb888, prelude::RgbColor};
 use rand::RngCore;
-use visualisation::{GameOfLife, RngU32, SandPile, TestVis};
+use visualisation::{GameOfLife, RngU32, SandPile, TestVis, Turmite};
 
 struct Buffer<const W: usize, const H: usize>
 where
@@ -21,7 +21,7 @@ struct App<const W: usize, const H: usize>
 where
     [(); W * H * 3]: Sized,
 {
-    state: visualisation::CurrentState,
+    state: visualisation::CurrentState<RandU32Rng>,
     texture: TextureHandle,
     buffer: Buffer<W, H>,
     last_update: Instant,
@@ -47,10 +47,12 @@ where
             TextureOptions::NEAREST,
         );
 
-        let mut gol = GameOfLife::new_with_random(1000, RandU32Rng);
+        // let mut gol = GameOfLife::new_with_random(1000, RandU32Rng);
+        // let mut sandpile: SandPile<_, 64, 32> = SandPile::new(RandU32Rng);
+	let turmite = Turmite::new();
 
         App {
-            state: visualisation::CurrentState::GameOfLife(gol),
+            state: visualisation::CurrentState::Turmite(turmite),
             texture,
             buffer: Buffer { buffer },
             last_update: Instant::now(),

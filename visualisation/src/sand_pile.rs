@@ -1,4 +1,4 @@
-use crate::RngU32;
+use crate::{RngU32, grid::Grid};
 
 use super::{StateUpdate, Visualisation};
 
@@ -58,72 +58,89 @@ use embedded_graphics::{
 };
 use queue::Queue;
 
-pub struct SandPile<const R: usize, const C: usize>
+pub struct SandPile<Rng, const W: usize, const H: usize>
 where
-    [(); R * C]:,
+    [(); W * H]:,
 {
-    sand: [u8; R * C],
-    queue: Queue<(u8, u8), 2048>,
-    row: u8,
-    col: u8,
-    n_updates_per_iteration: usize,
+    sand: Grid<u8, W, H>,
+    /// a list of coordinates to collapse
+    collapse_queue: Queue<(u8, u8), 2048>,
+    rng: Rng,
+    x_drop: i32,
+    y_drop: i32,
+    /// if true, drop sand in random positions, otherwise use the x and y
+    drop_randomly: bool,
 }
 
-impl<const R: usize, const C: usize> SandPile<R, C>
+impl<Rng: RngU32, const W: usize, const H: usize> SandPile<Rng, W, H>
 where
-    [(); R * C]:,
+    [(); W * H]:,
 {
-    pub fn new<Rng: RngU32>(mut rng: Rng) -> Self
+    pub fn new(mut rng: Rng) -> Self
     where
-        [(); R * C]:,
+        [(); W * H]:,
     {
         let rn = rng.next_u32() as usize;
-        let row: u8 = (rn % R) as u8;
-        let col: u8 = ((rn >> 16) % C) as u8;
-
+        let x = (rn % W) as i32;
+        let y = ((rn >> 16) % H) as i32;
         SandPile {
-            sand: [0; R * C],
-            queue: Queue::new(),
-            row,
-            col,
-            n_updates_per_iteration: 50,
+            sand: Grid::new(0),
+            collapse_queue: Queue::new(),
+            rng,
+            x_drop: x,
+            y_drop: y,
+            drop_randomly: true,
         }
     }
 
-    fn get_mut(
-        &mut self,
-        row: u8,
-        col: u8,
-        offset_row: i8,
-        offset_col: i8,
-    ) -> Option<(&mut u8, (u8, u8))> {
-        let r = row.checked_add_signed(offset_row)? as usize;
-        if r >= R {
-            return None;
-        }
-        let c = col.checked_add_signed(offset_col)? as usize;
-        if c >= C {
-            return None;
-        }
-        Some((&mut self.sand[r * C + c], (r as u8, c as u8)))
-    }
-
-    fn update_position(&mut self, row: u8, col: u8) {
-        loop {
-            let pos = self.get_mut(row, col, 0, 0).unwrap().0;
-            if *pos < 4 {
-                return;
-            } else {
-                *pos = *pos - 4;
-                for (i, j) in [(-1, 0), (1, 0), (0, -1), (0, 1)] {
-                    if let Some((other_pos, index)) = self.get_mut(row, col, i, j) {
-                        *other_pos = *other_pos + 1;
-                        if *other_pos >= 4 {
-                            self.queue.push_unique(index);
+    /// pull from the queue until something happens in the grid.
+    /// Returns false if nothing happened. Returns true if something happened
+    fn pull_until_changed(&mut self) -> bool {
+        while let Some((x, y)) = self.collapse_queue.pull() {
+            if let Some(v) = self.sand.get_mut(x as i32, y as i32)
+                && *v >= 4
+            {
+                *v -= 4;
+                for (dx, dy) in [(-1, 0), (1, 0), (0, -1), (0, 1)] {
+                    let (ox, oy) = (x as i32 + dx, y as i32 + dy);
+                    if let Some(other) = self.sand.get_mut(ox, oy) {
+                        *other += 1;
+                        if *other >= 4 {
+                            self.collapse_queue.push_unique((ox as u8, oy as u8));
                         }
                     }
                 }
+                return true;
             }
+        }
+        false
+    }
+
+    fn place_sand(&mut self) -> bool {
+        let (x, y) = if self.drop_randomly {
+            let rn = self.rng.next_u32() as usize;
+            let x = (rn % W) as i32;
+            let y = ((rn >> 16) % H) as i32;
+            (x, y)
+        } else {
+            (self.x_drop, self.y_drop)
+        };
+
+        if let Some(sand) = self.sand.get_mut(x, y) {
+            *sand += 1;
+            if *sand >= 4 {
+                self.collapse_queue.push_unique((x as u8, y as u8));
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Update the simulation until something changes
+    fn step_until_changed(&mut self) {
+        if !self.pull_until_changed() {
+            while !self.place_sand() {}
         }
     }
 }
@@ -134,22 +151,25 @@ pub enum SandpileStateUpdate {
 
 impl StateUpdate for SandpileStateUpdate {}
 
-impl<const R: usize, const C: usize> Visualisation for SandPile<R, C>
+impl<Rng: RngU32, const W: usize, const H: usize> Visualisation for SandPile<Rng, W, H>
 where
-    [(); R * C]:,
+    [(); W * H]:,
 {
     type StateUpdate = SandpileStateUpdate;
 
     fn update(&mut self, _delta_time_us: u32) -> bool {
-        for _ in 0..self.n_updates_per_iteration {
-            // add to the selected row
-            let pos = self.get_mut(self.row, self.col, 0, 0).unwrap().0;
-            *pos = pos.saturating_add(1);
-            self.queue.push_unique((self.row, self.col));
+        // for _ in 0..self.n_updates_per_iteration {
+        //     // add to the selected row
+        //     let pos = self.get_mut(self.row, self.col, 0, 0).unwrap().0;
+        //     *pos = pos.saturating_add(1);
+        //     self.collapse_queue.push_unique((self.row, self.col));
 
-            while let Some((row, col)) = self.queue.pull() {
-                self.update_position(row, col);
-            }
+        //     while let Some((row, col)) = self.collapse_queue.pull() {
+        //         self.update_position(row, col);
+        //     }
+        // }
+        for _ in 0..100 {
+            self.step_until_changed();
         }
 
         true
@@ -165,21 +185,16 @@ where
         target: &mut D,
     ) {
         target
-            .draw_iter(
-                (0..R)
-                    .flat_map(|r| (0..C).map(move |c| (r, c)))
-                    .zip(self.sand)
-                    .map(|((r, c), p)| {
-                        let colour = match p {
-                            0 => Rgb888::BLACK,
-                            1 => Rgb888::WHITE,
-                            2 => Rgb888::RED,
-                            3 => Rgb888::BLUE,
-                            _ => Rgb888::CSS_HOT_PINK,
-                        };
-                        Pixel(Point::new(c as i32, r as i32), colour)
-                    }),
-            )
+            .draw_iter(self.sand.iter_with_index().map(|((x, y), v)| {
+                let colour = match v {
+                    0 => Rgb888::BLACK,
+                    1 => Rgb888::WHITE,
+                    2 => Rgb888::RED,
+                    3 => Rgb888::BLUE,
+                    _ => Rgb888::CSS_HOT_PINK,
+                };
+                Pixel(Point::new(x, y), colour)
+            }))
             .unwrap();
     }
 }
