@@ -147,8 +147,8 @@ where
             state: TurmiteState {
                 internal: State::A,
                 direction: Direction::Left,
-                x: 0,
-                y: 0,
+                x: W as i32/2,
+                y: H as i32/2,
             },
             grid: Grid::new(Colour::A),
         }
@@ -177,7 +177,7 @@ where
 {
     type StateUpdate = TurmiteUpdate;
 
-    fn update(&mut self, delta_time_us: u32) -> bool {
+    fn update(&mut self, _delta_time_us: u32) -> bool {
         self.step();
         true
     }

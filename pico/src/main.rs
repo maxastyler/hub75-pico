@@ -9,6 +9,7 @@ use core::pin::pin;
 use defmt::*;
 use embassy_executor::{Executor, Spawner};
 use embassy_futures::yield_now;
+use embassy_rp::Peri;
 use embassy_rp::dma::Channel;
 use embassy_rp::gpio::{Level, Output, Pin};
 use embassy_rp::multicore::{Stack, spawn_core1};
@@ -71,52 +72,58 @@ async fn comms_and_display_runner(spawner: Spawner, p: embassy_rp::Peripherals) 
 //     visualisation.run(lut).await;
 // }
 
+struct DisplayCoreTaskArgs {
+    pio: Pio<'static, PIO0>,
+    r1: Peri<'static, PIN_0>,
+    g1: Peri<'static, PIN_1>,
+    b1: Peri<'static, PIN_2>,
+    r2: Peri<'static, PIN_3>,
+    g2: Peri<'static, PIN_4>,
+    b2: Peri<'static, PIN_5>,
+    a: Peri<'static, PIN_6>,
+    b: Peri<'static, PIN_7>,
+    c: Peri<'static, PIN_8>,
+    d: Peri<'static, PIN_9>,
+    clk: Peri<'static, PIN_10>,
+    lat: Peri<'static, PIN_11>,
+    oe: Peri<'static, PIN_12>,
+    fb_channel: Peri<'static, DMA_CH0>,
+    fb_loop_channel: Peri<'static, DMA_CH1>,
+    oe_channel: Peri<'static, DMA_CH2>,
+    oe_loop_channel: Peri<'static, DMA_CH3>,
+}
+
 #[embassy_executor::task]
 async fn run_display_core_task(
     frame_buffer_1: *mut [u8; FB_BYTES],
     frame_buffer_2: *mut [u8; FB_BYTES],
     lut: &'static GammaLut<Init>,
-    pio: Pio<'static, PIO0>,
-    r1: PIN_0,
-    g1: PIN_1,
-    b1: PIN_2,
-    r2: PIN_3,
-    g2: PIN_4,
-    b2: PIN_5,
-    a: PIN_6,
-    b: PIN_7,
-    c: PIN_8,
-    d: PIN_9,
-    clk: PIN_10,
-    lat: PIN_11,
-    oe: PIN_12,
-    fb_channel: DMA_CH0,
-    fb_loop_channel: DMA_CH1,
-    oe_channel: DMA_CH2,
-    oe_loop_channel: DMA_CH3,
+    pin_args: DisplayCoreTaskArgs,
 ) {
+    let p = pin_args;
+
     run_display_core(
         frame_buffer_1,
         frame_buffer_2,
         lut,
-        pio,
-        r1,
-        g1,
-        b1,
-        r2,
-        g2,
-        b2,
-        a,
-        b,
-        c,
-        d,
-        clk,
-        lat,
-        oe,
-        fb_channel,
-        fb_loop_channel,
-        oe_channel,
-        oe_loop_channel,
+        p.pio,
+        p.r1,
+        p.g1,
+        p.b1,
+        p.r2,
+        p.g2,
+        p.b2,
+        p.a,
+        p.b,
+        p.c,
+        p.d,
+        p.clk,
+        p.lat,
+        p.oe,
+        p.fb_channel,
+        p.fb_loop_channel,
+        p.oe_channel,
+        p.oe_loop_channel,
     )
     .await;
 }
@@ -148,16 +155,16 @@ fn main() -> ! {
     let mut fb_2: [u8; FB_BYTES] = [0; FB_BYTES];
     let lut: &'static GammaLut<Init> = GAMMA_LUT.init(GammaLut::new().init((1.0, 1.0, 1.0)));
 
-    let core_1_stack = CORE_1_STACK.take();
+    // let core_1_stack = CORE_1_STACK.take();
 
-    spawn_core1(p.CORE1, core_1_stack, move || {
-        let executor1 = EXECUTOR1.init(Executor::new());
-        executor1.run(|spawner| {
-            spawner.spawn(comms_and_display_runner(spawner, unsafe {
-                embassy_rp::Peripherals::steal()
-            }));
-        });
-    });
+    // spawn_core1(p.CORE1, core_1_stack, move || {
+    //     let executor1 = EXECUTOR1.init(Executor::new());
+    //     executor1.run(|spawner| {
+    //         spawner.spawn(comms_and_display_runner(spawner, unsafe {
+    //             embassy_rp::Peripherals::steal()
+    //         }));
+    //     });
+    // });
 
     let executor0 = EXECUTOR0.init(Executor::new()); // filled_framebuffer_signal.signal(fb_1);
     // executor0.run(move |spawner| {
@@ -175,24 +182,26 @@ fn main() -> ! {
             &mut fb_1 as *mut [u8; FB_BYTES],
             &mut fb_2 as *mut [u8; FB_BYTES],
             lut,
-            Pio::new(p.PIO0, Irqs),
-            p.PIN_0,
-            p.PIN_1,
-            p.PIN_2,
-            p.PIN_3,
-            p.PIN_4,
-            p.PIN_5,
-            p.PIN_6,
-            p.PIN_7,
-            p.PIN_8,
-            p.PIN_9,
-            p.PIN_10,
-            p.PIN_11,
-            p.PIN_12,
-            p.DMA_CH0,
-            p.DMA_CH1,
-            p.DMA_CH2,
-            p.DMA_CH3
+            DisplayCoreTaskArgs {
+            pio: Pio::new(p.PIO0, Irqs),
+            r1: p.PIN_0,
+            g1: p.PIN_1,
+            b1: p.PIN_2,
+            r2: p.PIN_3,
+            g2: p.PIN_4,
+            b2: p.PIN_5,
+            a: p.PIN_6,
+            b: p.PIN_7,
+            c: p.PIN_8,
+            d: p.PIN_9,
+            clk: p.PIN_10,
+            lat: p.PIN_11,
+            oe: p.PIN_12,
+            fb_channel: p.DMA_CH0,
+            fb_loop_channel: p.DMA_CH1,
+            oe_channel: p.DMA_CH2,
+            oe_loop_channel: p.DMA_CH3,
+        }
         )))
     })
 }

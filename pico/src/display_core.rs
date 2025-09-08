@@ -1,10 +1,12 @@
-use embassy_rp::Peripheral;
+#![allow(non_camel_case_types)]
+
+use embassy_rp::Peri;
 use embassy_rp::dma::Channel;
 use embassy_rp::pio::{Instance, Pio, PioPin};
 use embassy_time::Duration;
 
-use crate::{Display, FB_BYTES, FrameBuffer, Irqs, Lut};
-use visualisation::{CurrentState, GameOfLife, SandPile, TestVis, Turmite};
+use crate::{Display, FB_BYTES, Irqs, Lut};
+use visualisation::{CurrentState, SandPile, Turmite};
 
 struct Trng<'d> {
     trng: embassy_rp::trng::Trng<'d, embassy_rp::peripherals::TRNG>,
@@ -28,36 +30,30 @@ impl<'d> visualisation::RngU32 for Trng<'d> {
     }
 }
 
-pub async fn run_display_core<'a, PIO: Instance, L: Lut + Copy, FB_CH, FB_L_CH, OE_CH, OE_L_CH>(
+pub async fn run_display_core<L: Lut + Copy>(
     frame_buffer_1: *mut [u8; FB_BYTES],
     frame_buffer_2: *mut [u8; FB_BYTES],
     lut: L,
-    pio: Pio<'a, PIO>,
-    r1: impl Peripheral<P = impl PioPin + 'a> + 'a,
-    g1: impl Peripheral<P = impl PioPin + 'a> + 'a,
-    b1: impl Peripheral<P = impl PioPin + 'a> + 'a,
-    r2: impl Peripheral<P = impl PioPin + 'a> + 'a,
-    g2: impl Peripheral<P = impl PioPin + 'a> + 'a,
-    b2: impl Peripheral<P = impl PioPin + 'a> + 'a,
-    a: impl Peripheral<P = impl PioPin + 'a> + 'a,
-    b: impl Peripheral<P = impl PioPin + 'a> + 'a,
-    c: impl Peripheral<P = impl PioPin + 'a> + 'a,
-    d: impl Peripheral<P = impl PioPin + 'a> + 'a,
-    clk: impl Peripheral<P = impl PioPin + 'a> + 'a,
-    lat: impl Peripheral<P = impl PioPin + 'a> + 'a,
-    oe: impl Peripheral<P = impl PioPin + 'a> + 'a,
-    fb_channel: impl Peripheral<P = FB_CH> + 'a,
-    fb_loop_channel: impl Peripheral<P = FB_L_CH> + 'a,
-    oe_channel: impl Peripheral<P = OE_CH> + 'a,
-    oe_loop_channel: impl Peripheral<P = OE_L_CH> + 'a,
-) where
-    PIO: Instance,
-    FB_CH: Channel,
-    FB_L_CH: Channel,
-    OE_CH: Channel,
-    OE_L_CH: Channel,
-{
-    let mut display: Display<64, 32, PIO, _, _, _, _, _> = Display::new(
+    pio: Pio<'static, impl Instance>,
+    r1: Peri<'static, impl PioPin>,
+    g1: Peri<'static, impl PioPin>,
+    b1: Peri<'static, impl PioPin>,
+    r2: Peri<'static, impl PioPin>,
+    g2: Peri<'static, impl PioPin>,
+    b2: Peri<'static, impl PioPin>,
+    a: Peri<'static, impl PioPin>,
+    b: Peri<'static, impl PioPin>,
+    c: Peri<'static, impl PioPin>,
+    d: Peri<'static, impl PioPin>,
+    clk: Peri<'static, impl PioPin>,
+    lat: Peri<'static, impl PioPin>,
+    oe: Peri<'static, impl PioPin>,
+    fb_channel: Peri<'static, impl Channel>,
+    fb_loop_channel: Peri<'static, impl Channel>,
+    oe_channel: Peri<'static, impl Channel>,
+    oe_loop_channel: Peri<'static, impl Channel>,
+) -> ! {
+    let mut display: Display<64, 32, _, _, _, _, _, _> = Display::new(
         lut,
         pio,
         frame_buffer_1,
@@ -82,8 +78,9 @@ pub async fn run_display_core<'a, PIO: Instance, L: Lut + Copy, FB_CH, FB_L_CH, 
     );
 
     // let mut state = CurrentState::GameOfLife(GameOfLife::new_with_random(1000, Trng::new()));
-    // let mut state: CurrentState<Trng> = CurrentState::Turmite(Turmite::new());
-    let mut state: CurrentState<Trng> = CurrentState::SandPile(SandPile::new(Trng::new()));
+    let mut turmite = Turmite::new();
+    let mut state: CurrentState<Trng> = CurrentState::Turmite(turmite);
+    // let mut state: CurrentState<Trng> = CurrentState::SandPile(SandPile::new(Trng::new()));
 
     let mut start_time = embassy_time::Instant::now();
 

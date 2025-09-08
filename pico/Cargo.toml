@@ -5,27 +5,29 @@ edition = "2024"
 
 [dependencies]
 visualisation = { path = "../visualisation" }
-bt-hci = { version = "0.2.1", features = [] }
-cortex-m = { version = "0.7.7", features = ["inline-asm"] }
-cortex-m-rt = "0.7.5"
-critical-section = "1.2.0"
-cyw43 = { version = "0.3.0", features = ["defmt", "firmware-logs", "bluetooth"] }
-cyw43-pio = { version = "0.4.0", features = ["defmt"] }
-defmt = "1.0.1"
-defmt-rtt = "1.0.0"
-embassy-embedded-hal = { version = "0.3.0", features = ["defmt"] }
-embassy-executor = { version = "0.7.0", features = ["arch-cortex-m", "executor-thread", "executor-interrupt", "defmt", "task-arena-size-40960"] }
-embassy-futures = "0.1.1"
-embassy-net = { version = "0.7.0", features = ["defmt", "tcp", "udp", "raw", "dhcpv4", "medium-ethernet", "dns"] }
-embassy-rp = { version = "0.4.0", features = ["binary-info", "critical-section-impl", "defmt", "rp235xa", "time-driver", "unstable-pac"] }
-embassy-sync = { version = "0.7.0", features = ["defmt"] }
-embassy-time = { version = "0.4.0", features = ["defmt", "defmt-timestamp-uptime"] }
-embassy-usb = { version = "0.4.0", features = ["defmt"] }
-embassy-usb-logger = "0.4.0"
-embedded-graphics = "0.8.1"
+bt-hci = { version = "0.4", features = [] }
+cortex-m = { version = "0.7", features = ["inline-asm"] }
+cortex-m-rt = "0.7"
+critical-section = "1.2"
+cyw43 = { version = "0.5", features = ["defmt", "firmware-logs", "bluetooth"] }
+cyw43-pio = { version = "0.8", features = ["defmt"] }
+defmt = "1.0"
+defmt-rtt = "1.0"
+embassy-embedded-hal = { version = "0.5", features = ["defmt"] }
+embassy-executor = { version = "0.9", features = ["arch-cortex-m", "executor-thread", "executor-interrupt", "defmt"] }
+embassy-futures = "0.1"
+embassy-net = { version = "0.7", features = ["defmt", "tcp", "udp", "raw", "dhcpv4", "medium-ethernet", "dns"] }
+embassy-rp = { version = "0.8", features = ["binary-info", "critical-section-impl", "defmt", "rp235xa", "time-driver", "unstable-pac"] }
+embassy-sync = { version = "0.7", features = ["defmt"] }
+embassy-time = { version = "0.5", features = ["defmt", "defmt-timestamp-uptime"] }
+embassy-usb = { version = "0.5", features = ["defmt"] }
+embassy-usb-logger = "0.5"
+embedded-graphics = "0.8"
 fixed = "1.29.0"
-libm = "0.2.15"
+libm = "0.2"
 panic-probe = { version = "1.0.0", features = ["print-defmt"] }
 pio = "0.3.0"
-static_cell = "2.1.0"
-trouble-host = "0.1.0"
+static_cell = "2.1"
+# use the git dependency of trouble, since bt-hci is a lower version in the crates version of trouble-host
+# trouble-host = "0.2"
+trouble-host = { git = "https://github.com/embassy-rs/trouble.git", rev = "26ec6794d0a976dd91cd694b631c72b16ddf651b" }

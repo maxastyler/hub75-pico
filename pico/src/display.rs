@@ -1,20 +1,15 @@
-use core::convert::Infallible;
-use core::hint::spin_loop;
-use core::marker::PhantomData;
+#![allow(non_camel_case_types)]
 use core::mem::transmute;
 
 use embassy_rp::dma::Channel;
 use embassy_rp::pac::common::{RW, Reg};
 use embassy_rp::pac::dma::regs::CtrlTrig;
 use embassy_rp::pac::dma::vals::{DataSize, TreqSel};
-use embassy_rp::peripherals::PIO0;
 use embassy_rp::pio::{
     Common, Config as PioConfig, Direction, FifoJoin, Instance as PioInstance, Pin, Pio, PioPin,
     ShiftDirection, StateMachine,
 };
-use embassy_rp::{Peripheral, PeripheralRef};
-use embedded_graphics::pixelcolor::Rgb888;
-use embedded_graphics::prelude::{DrawTarget, OriginDimensions, Size};
+use embassy_rp::{Peri, PeripheralType};
 use fixed::FixedU32;
 use fixed::types::extra::U8;
 use static_cell::StaticCell;
@@ -44,15 +39,22 @@ const fn delays<const B: usize>() -> [u32; B] {
     ds
 }
 
-struct DisplayPeripherals<'a, PIO: PioInstance, FB_CH, FB_L_CH, OE_CH, OE_L_CH> {
+struct DisplayPeripherals<'a, PIO, FB_CH, FB_L_CH, OE_CH, OE_L_CH>
+where
+    PIO: PioInstance,
+    FB_CH: PeripheralType,
+    FB_L_CH: PeripheralType,
+    OE_CH: PeripheralType,
+    OE_L_CH: PeripheralType,
+{
     common: Common<'a, PIO>,
     rgb_sm: StateMachine<'a, PIO, 0>,
     row_sm: StateMachine<'a, PIO, 1>,
     oe_sm: StateMachine<'a, PIO, 2>,
-    fb_channel: PeripheralRef<'a, FB_CH>,
-    fb_loop_channel: PeripheralRef<'a, FB_L_CH>,
-    oe_channel: PeripheralRef<'a, OE_CH>,
-    oe_loop_channel: PeripheralRef<'a, OE_L_CH>,
+    fb_channel: Peri<'a, FB_CH>,
+    fb_loop_channel: Peri<'a, FB_L_CH>,
+    oe_channel: Peri<'a, OE_CH>,
+    oe_loop_channel: Peri<'a, OE_L_CH>,
 }
 
 fn setup_rgb_state_machine<'a, PIO: PioInstance, const N: usize, const W: usize>(
@@ -176,8 +178,8 @@ fn setup_delay_state_machine<'a, PIO: PioInstance, const N: usize>(
 }
 
 fn setup_framebuffer_channel<const W: usize, const H: usize, FB_CH: Channel, FB_L_CH: Channel>(
-    fb_channel: PeripheralRef<'_, FB_CH>,
-    fb_loop_channel: PeripheralRef<'_, FB_L_CH>,
+    fb_channel: Peri<'_, FB_CH>,
+    fb_loop_channel: Peri<'_, FB_L_CH>,
     pio_dreq_sel: TreqSel,
     framebuffer: *const [u8; FB_BYTES],
     rgb_state_machine_tx_register: &Reg<u32, RW>,
@@ -215,8 +217,8 @@ fn setup_framebuffer_loop_channel<
     FB_L_CH: Channel,
     FB_CH: Channel,
 >(
-    fb_loop_channel: PeripheralRef<'_, FB_L_CH>,
-    fb_channel: PeripheralRef<'_, FB_CH>,
+    fb_loop_channel: Peri<'_, FB_L_CH>,
+    fb_channel: Peri<'_, FB_CH>,
     framebuffer_pointer_location: &mut *const [u8],
 ) {
     fb_loop_channel.regs().al1_ctrl().write(|c| {
@@ -244,8 +246,8 @@ fn setup_framebuffer_loop_channel<
 
 /// `pio_dreq_sel` is the dreq trigger for the oe state machine
 fn setup_oe_channel<OE_CH: Channel, OE_L_CH: Channel>(
-    oe_channel: PeripheralRef<'_, OE_CH>,
-    oe_loop_channel: PeripheralRef<'_, OE_L_CH>,
+    oe_channel: Peri<'_, OE_CH>,
+    oe_loop_channel: Peri<'_, OE_L_CH>,
     pio_dreq_sel: TreqSel,
     oe_state_machine_tx_register: &Reg<u32, RW>,
 ) {
@@ -276,8 +278,8 @@ fn setup_oe_channel<OE_CH: Channel, OE_L_CH: Channel>(
 
 /// `pio_dreq_sel` is the dreq trigger for the oe state machine
 fn setup_oe_loop_channel<const W: usize, const H: usize, OE_CH: Channel, OE_L_CH: Channel>(
-    oe_loop_channel: PeripheralRef<'_, OE_L_CH>,
-    oe_channel: PeripheralRef<'_, OE_CH>,
+    oe_loop_channel: Peri<'_, OE_L_CH>,
+    oe_channel: Peri<'_, OE_CH>,
 ) {
     oe_loop_channel.regs().al1_ctrl().write(|c| {
         let mut t = CtrlTrig(*c);
@@ -314,7 +316,13 @@ pub struct Display<
     FB_L_CH,
     OE_CH,
     OE_L_CH,
-> {
+> where
+    PIO: PioInstance,
+    FB_CH: PeripheralType,
+    FB_L_CH: PeripheralType,
+    OE_CH: PeripheralType,
+    OE_L_CH: PeripheralType,
+{
     pub brightness: u8,
     pub lut: L,
     _peripherals: DisplayPeripherals<'a, PIO, FB_CH, FB_L_CH, OE_CH, OE_L_CH>,
@@ -346,23 +354,23 @@ where
         pio: Pio<'a, PIO>,
         frame_buffer_1: *mut [u8; FB_BYTES],
         frame_buffer_2: *mut [u8; FB_BYTES],
-        r1: impl Peripheral<P = impl PioPin + 'a> + 'a,
-        g1: impl Peripheral<P = impl PioPin + 'a> + 'a,
-        b1: impl Peripheral<P = impl PioPin + 'a> + 'a,
-        r2: impl Peripheral<P = impl PioPin + 'a> + 'a,
-        g2: impl Peripheral<P = impl PioPin + 'a> + 'a,
-        b2: impl Peripheral<P = impl PioPin + 'a> + 'a,
-        a: impl Peripheral<P = impl PioPin + 'a> + 'a,
-        b: impl Peripheral<P = impl PioPin + 'a> + 'a,
-        c: impl Peripheral<P = impl PioPin + 'a> + 'a,
-        d: impl Peripheral<P = impl PioPin + 'a> + 'a,
-        clk: impl Peripheral<P = impl PioPin + 'a> + 'a,
-        lat: impl Peripheral<P = impl PioPin + 'a> + 'a,
-        oe: impl Peripheral<P = impl PioPin + 'a> + 'a,
-        fb_channel: impl Peripheral<P = FB_CH> + 'a,
-        fb_loop_channel: impl Peripheral<P = FB_L_CH> + 'a,
-        oe_channel: impl Peripheral<P = OE_CH> + 'a,
-        oe_loop_channel: impl Peripheral<P = OE_L_CH> + 'a,
+        r1: Peri<'a, impl PioPin>,
+        g1: Peri<'a, impl PioPin>,
+        b1: Peri<'a, impl PioPin>,
+        r2: Peri<'a, impl PioPin>,
+        g2: Peri<'a, impl PioPin>,
+        b2: Peri<'a, impl PioPin>,
+        a: Peri<'a, impl PioPin>,
+        b: Peri<'a, impl PioPin>,
+        c: Peri<'a, impl PioPin>,
+        d: Peri<'a, impl PioPin>,
+        clk: Peri<'a, impl PioPin>,
+        lat: Peri<'a, impl PioPin>,
+        oe: Peri<'a, impl PioPin>,
+        mut fb_channel: Peri<'static, FB_CH>,
+        mut fb_loop_channel: Peri<'static, FB_L_CH>,
+        mut oe_channel: Peri<'static, OE_CH>,
+        mut oe_loop_channel: Peri<'static, OE_L_CH>,
     ) -> Self {
         let ptr_to_framebuffer: &'static mut *const [u8] = PTR_TO_FRAMEBUFFER.init(frame_buffer_1);
 
@@ -408,10 +416,10 @@ where
 
         setup_delay_state_machine(&mut common, &mut oe_sm, &oe, 1.2);
 
-        let mut fb_channel = fb_channel.into_ref();
-        let mut fb_loop_channel = fb_loop_channel.into_ref();
-        let mut oe_channel = oe_channel.into_ref();
-        let mut oe_loop_channel = oe_loop_channel.into_ref();
+        // let mut fb_channel = fb_channel;
+        // let mut fb_loop_channel = fb_loop_channel;
+        // let mut oe_channel = oe_channel;
+        // let mut oe_loop_channel = oe_loop_channel;
 
         setup_framebuffer_channel::<64, 32, _, _>(
             fb_channel.reborrow(),

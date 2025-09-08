@@ -1,11 +1,10 @@
-use embassy_rp::dma::Channel;
 use embedded_graphics::{
     Pixel,
     pixelcolor::Rgb888,
     prelude::{DrawTarget, OriginDimensions, Size},
 };
 
-use crate::{Display, Lut, fb_bytes};
+use crate::{Lut, fb_bytes};
 
 pub struct FrameBuffer<'a, const W: usize, const H: usize, Lut>
 where

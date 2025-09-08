@@ -3,14 +3,12 @@ use cyw43::bluetooth::BtDriver;
 use cyw43_pio::{PioSpi, RM2_CLOCK_DIVIDER};
 use defmt::*;
 use embassy_executor::Spawner;
-use embassy_futures::{join::join, select::select};
+use embassy_futures::join::join;
 use embassy_rp::{
-    Peripheral,
-    dma::Channel,
+    Peri,
     gpio::{Level, Output},
-    interrupt::typelevel::Binding,
     peripherals::{DMA_CH6, PIO1},
-    pio::{Instance as PioInstance, InterruptHandler, Pio, PioPin},
+    pio::{Pio, PioPin},
 };
 use embassy_time::{Duration, Timer, with_timeout};
 use static_cell::StaticCell;
@@ -33,13 +31,13 @@ async fn cyw43_task(
 }
 
 impl<const N: usize> Comms<N> {
-    pub async fn new<DIO: PioPin, CLK: PioPin>(
+    pub async fn new<'a, DIO: PioPin, CLK: PioPin>(
         spawner: Spawner,
-        pwr: impl Peripheral<P = impl PioPin> + 'static,
-        cs: impl Peripheral<P = impl PioPin> + 'static,
-        dio: DIO,
-        clk: CLK,
-        channel: impl Peripheral<P = DMA_CH6> + 'static,
+        pwr: Peri<'static, impl PioPin>,
+        cs: Peri<'static, impl PioPin>,
+        dio: Peri<'static, DIO>,
+        clk: Peri<'static, CLK>,
+        channel: Peri<'static, DMA_CH6>,
         mut pio: Pio<'static, PIO1>,
     ) {
         info!("setting up stuff");
@@ -87,7 +85,7 @@ impl<const N: usize> Comms<N> {
 }
 
 #[embassy_executor::task]
-async fn run_task(controller: ExternalController<BtDriver<'static>, 10>) {
+async fn run_task(controller: ExternalController<BtDriver<'static>, 10>) -> () {
     run(controller).await;
 }
 
@@ -98,7 +96,7 @@ where
     // Hardcoded peripheral address
     let address: Address = Address::random([0xff, 0x8f, 0x1a, 0x05, 0xe4, 0xff]);
 
-    let mut resources: HostResources<CONNECTIONS_MAX, L2CAP_CHANNELS_MAX, 251, 16> =
+    let mut resources: HostResources<DefaultPacketPool, CONNECTIONS_MAX, L2CAP_CHANNELS_MAX> =
         HostResources::new();
     info!("Create resources");
     let stack = trouble_host::new(controller, &mut resources).set_random_address(address);
@@ -145,7 +143,7 @@ where
             info!("Connection established");
 
             let config = L2capChannelConfig {
-                mtu: 256,
+                mtu: Some(256),
                 ..Default::default()
             };
 
@@ -166,7 +164,7 @@ where
             // Size of payload we're expecting
             const PAYLOAD_LEN: usize = 27;
             let mut rx = [0; PAYLOAD_LEN];
-            for i in 0..10 {
+            for _i in 0..10 {
                 match ch1.receive(&stack, &mut rx).await {
                     Ok(len) => {
                         info!("Received a payload: {}", rx[..len])
@@ -184,7 +182,7 @@ where
             Timer::after(Duration::from_secs(1)).await;
             for i in 0..10 {
                 let tx = [i; PAYLOAD_LEN];
-                ch1.send::<C, 100>(&stack, &tx).await.unwrap();
+                ch1.send::<C>(&stack, &tx).await.unwrap();
             }
             ch1.disconnect();
             conn.disconnect();
