@@ -49,7 +49,9 @@ where
 
         // let mut gol = GameOfLife::new_with_random(1000, RandU32Rng);
         // let mut sandpile: SandPile<_, 64, 32> = SandPile::new(RandU32Rng);
-	let turmite = Turmite::new();
+	let mut turmite = Turmite::new();
+	turmite.state.x = 32;
+	turmite.state.y = 16;	
 
         App {
             state: visualisation::CurrentState::Turmite(turmite),
@@ -113,7 +115,7 @@ where
 {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let time_since_last = self.last_update.elapsed();
-        if time_since_last > Duration::from_millis(100) {
+        if time_since_last > Duration::from_millis(10) {
             self.last_update = Instant::now();
             self.state.update(time_since_last.as_micros() as u32);
             self.clear();

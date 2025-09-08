@@ -63,10 +63,10 @@ impl TwoByTwoTurmiteRule {
 }
 
 pub struct TurmiteState {
-    internal: State,
-    direction: Direction,
-    x: i32,
-    y: i32,
+    pub internal: State,
+    pub direction: Direction,
+    pub x: i32,
+    pub y: i32,
 }
 
 impl TurmiteState {
@@ -104,8 +104,8 @@ impl TurmiteState {
             (Direction::Up, Turn::Right) => Right,
             (Direction::Up, Turn::Back) => Down,
             (Direction::Left, Turn::Straight) => Left,
-            (Direction::Left, Turn::Left) => Up,
-            (Direction::Left, Turn::Right) => Down,
+            (Direction::Left, Turn::Left) => Down,
+            (Direction::Left, Turn::Right) => Up,
             (Direction::Left, Turn::Back) => Right,
             (Direction::Right, Turn::Straight) => Right,
             (Direction::Right, Turn::Left) => Up,
@@ -123,9 +123,9 @@ pub struct Turmite<const W: usize, const H: usize>
 where
     [(); W * H]:,
 {
-    rule: TwoByTwoTurmiteRule,
-    state: TurmiteState,
-    grid: Grid<Colour, W, H>,
+    pub rule: TwoByTwoTurmiteRule,
+    pub state: TurmiteState,
+    pub grid: Grid<Colour, W, H>,
 }
 
 impl<const W: usize, const H: usize> Turmite<W, H>
@@ -135,14 +135,18 @@ where
     pub fn new() -> Self {
         Turmite {
             rule: TwoByTwoTurmiteRule::new([
-                (State::A, Colour::B, Turn::Straight),
-                (State::A, Colour::A, Turn::Straight),
-                (State::B, Colour::B, Turn::Straight),
-                (State::B, Colour::A, Turn::Straight),
+                // (State::B, Colour::B, Turn::Left),
+                // (State::B, Colour::B, Turn::Left),
+                // (State::B, Colour::B, Turn::Right),
+                // (State::A, Colour::A, Turn::Straight),
+                (State::A, Colour::B, Turn::Left),
+                (State::A, Colour::A, Turn::Right),
+                (State::B, Colour::B, Turn::Left),
+                (State::B, Colour::A, Turn::Right),		
             ]),
             state: TurmiteState {
                 internal: State::A,
-                direction: Direction::Right,
+                direction: Direction::Left,
                 x: 0,
                 y: 0,
             },
