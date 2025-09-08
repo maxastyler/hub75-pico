@@ -28,84 +28,34 @@ use embassy_rp::pio::{
 use fixed::FixedU32;
 use fixed::types::extra::U8;
 use hub75_pico::{
-    Comms, Display, FB_BYTES, FrameBuffer, GammaLut, Init, Irqs, Lut, fb_bytes,
-    run_display_core,
+    Comms, Display, FB_BYTES, FrameBuffer, GammaLut, Init, Irqs, Lut, fb_bytes, run_display_core,
 };
 use pio::{ProgramWithDefines, pio_asm};
 use static_cell::{ConstStaticCell, StaticCell};
 use {defmt_rtt as _, panic_probe as _};
 
-static CORE_1_STACK: StaticCell<Stack<32768>> = StaticCell::new();
+static CORE_1_STACK: ConstStaticCell<Stack<100_000>> = ConstStaticCell::new(Stack::new());
 static EXECUTOR0: StaticCell<Executor> = StaticCell::new();
 static EXECUTOR1: StaticCell<Executor> = StaticCell::new();
 
 static GAMMA_LUT: StaticCell<GammaLut<Init>> = StaticCell::new();
 
-// #[embassy_executor::task]
-// async fn comms_and_display_runner(
-//     spawner: Spawner,
-//     p: embassy_rp::Peripherals,
-//     filled_framebuffer_signal: &'static Signal<
-//         CriticalSectionRawMutex,
-//         &'static mut [u8; FB_BYTES],
-//     >,
-//     empty_framebuffer_signal: &'static Signal<CriticalSectionRawMutex, &'static mut [u8; FB_BYTES]>,
-//     lut: &'static GammaLut<Init>,
-// ) {
-//     const W: usize = 64;
-//     const H: usize = 32;
+#[embassy_executor::task]
+async fn comms_and_display_runner(spawner: Spawner, p: embassy_rp::Peripherals) {
+    const W: usize = 64;
+    const H: usize = 32;
 
-//     let comms = Comms::<10>::new(
-//         spawner,
-//         p.PIN_23,
-//         p.PIN_25,
-//         p.PIN_24,
-//         p.PIN_29,
-//         p.DMA_CH6,
-//         Pio::new(p.PIO1, Irqs),
-//     )
-//     .await;
-
-//     // let fb_1 = [0; FB_BYTES];
-//     // let fb_2 = [0; FB_BYTES];
-
-//     let mut display: Display<64, 32, PIO0, _, _, _, _> = Display::new(
-//         lut,
-//         Pio::new(p.PIO0, Irqs),
-//         &mut fb_1 as *mut [u8; FB_BYTES],
-//         &mut fb_2 as *mut [u8; FB_BYTES],
-//         p.PIN_0,
-//         p.PIN_1,
-//         p.PIN_2,
-//         p.PIN_3,
-//         p.PIN_4,
-//         p.PIN_5,
-//         p.PIN_6,
-//         p.PIN_7,
-//         p.PIN_8,
-//         p.PIN_9,
-//         p.PIN_10,
-//         p.PIN_11,
-//         p.PIN_12,
-//         p.DMA_CH0,
-//         p.DMA_CH1,
-//         p.DMA_CH2,
-//         p.DMA_CH3,
-//     );
-
-//     // loop {
-//     //     // if the framebuffer signal is empty, then we can write something to it
-//     //     if filled_framebuffer_signal.signaled() {
-//     //         if !empty_framebuffer_signal.signaled() {
-//     //             let filled_fb = filled_framebuffer_signal.try_take().unwrap();
-//     //             let used_fb = display.set_new_framebuffer(filled_fb);
-//     //             used_fb.fill(0);
-//     //             empty_framebuffer_signal.signal(used_fb);
-//     //         }
-//     //     }
-//     //     yield_now().await;
-//     // }
-// }
+    let comms = Comms::<10>::new(
+        spawner,
+        p.PIN_23,
+        p.PIN_25,
+        p.PIN_24,
+        p.PIN_29,
+        p.DMA_CH6,
+        Pio::new(p.PIO1, Irqs),
+    )
+    .await;
+}
 
 // #[embassy_executor::task]
 // async fn run_visualisation(
@@ -197,6 +147,17 @@ fn main() -> ! {
     let mut fb_1: [u8; FB_BYTES] = [0; FB_BYTES];
     let mut fb_2: [u8; FB_BYTES] = [0; FB_BYTES];
     let lut: &'static GammaLut<Init> = GAMMA_LUT.init(GammaLut::new().init((1.0, 1.0, 1.0)));
+
+    let core_1_stack = CORE_1_STACK.take();
+
+    spawn_core1(p.CORE1, core_1_stack, move || {
+        let executor1 = EXECUTOR1.init(Executor::new());
+        executor1.run(|spawner| {
+            spawner.spawn(comms_and_display_runner(spawner, unsafe {
+                embassy_rp::Peripherals::steal()
+            }));
+        });
+    });
 
     let executor0 = EXECUTOR0.init(Executor::new()); // filled_framebuffer_signal.signal(fb_1);
     // executor0.run(move |spawner| {

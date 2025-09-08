@@ -168,7 +168,7 @@ where
         //         self.update_position(row, col);
         //     }
         // }
-        for _ in 0..100 {
+        for _ in 0..10 {
             self.step_until_changed();
         }
 
