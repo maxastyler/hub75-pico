@@ -35,7 +35,7 @@ use pio::{ProgramWithDefines, pio_asm};
 use static_cell::{ConstStaticCell, StaticCell};
 use {defmt_rtt as _, panic_probe as _};
 
-static CORE_1_STACK: ConstStaticCell<Stack<70_000>> = ConstStaticCell::new(Stack::new());
+static CORE_1_STACK: ConstStaticCell<Stack<120_000>> = ConstStaticCell::new(Stack::new());
 static EXECUTOR0: StaticCell<Executor> = StaticCell::new();
 static EXECUTOR1: StaticCell<Executor> = StaticCell::new();
 
@@ -52,25 +52,11 @@ async fn comms_and_display_runner(spawner: Spawner, p: embassy_rp::Peripherals) 
         p.PIN_25,
         p.PIN_24,
         p.PIN_29,
-        p.DMA_CH6,
+        p.DMA_CH8,
         Pio::new(p.PIO1, Irqs),
     )
     .await;
 }
-
-// #[embassy_executor::task]
-// async fn run_visualisation(
-//     filled_framebuffer_signal: &'static Signal<
-//         CriticalSectionRawMutex,
-//         &'static mut [u8; FB_BYTES],
-//     >,
-//     empty_framebuffer_signal: &'static Signal<CriticalSectionRawMutex, &'static mut [u8; FB_BYTES]>,
-//     lut: &'static GammaLut<Init>,
-// ) {
-//     let mut visualisation =
-//         VisualisationState::new(filled_framebuffer_signal, empty_framebuffer_signal);
-//     visualisation.run(lut).await;
-// }
 
 struct DisplayCoreTaskArgs {
     pio: Pio<'static, PIO0>,
@@ -128,25 +114,6 @@ async fn run_display_core_task(
     .await;
 }
 
-// fn display_core_main() {
-//     let p = embassy_rp::init(Default::default());
-
-//     let fb_1: &'static mut [u8; FB_BYTES] = FB_1.init([0; FB_BYTES]);
-//     let fb_2: &'static mut [u8; FB_BYTES] = FB_2.init([0; FB_BYTES]);
-//     let lut: &'static GammaLut<Init> = GAMMA_LUT.init(GammaLut::new().init((1.0, 1.0, 1.0)));
-
-//     let executor0 = EXECUTOR0.init(Executor::new());
-//     executor0.run(move |spawner| {
-//         unwrap!(spawner.spawn(comms_and_display_runner(
-//             spawner,
-//             p,
-//             filled_framebuffer_signal,
-//             empty_framebuffer_signal,
-//             lut,
-//         )))
-//     });
-// }
-
 #[cortex_m_rt::entry]
 fn main() -> ! {
     let p = embassy_rp::init(Default::default());
@@ -174,25 +141,25 @@ fn main() -> ! {
             &mut fb_2 as *mut [u8; FB_BYTES],
             lut,
             DisplayCoreTaskArgs {
-            pio: Pio::new(p.PIO0, Irqs),
-            r1: p.PIN_0,
-            g1: p.PIN_1,
-            b1: p.PIN_2,
-            r2: p.PIN_3,
-            g2: p.PIN_4,
-            b2: p.PIN_5,
-            a: p.PIN_6,
-            b: p.PIN_7,
-            c: p.PIN_8,
-            d: p.PIN_9,
-            clk: p.PIN_10,
-            lat: p.PIN_11,
-            oe: p.PIN_12,
-            fb_channel: p.DMA_CH0,
-            fb_loop_channel: p.DMA_CH1,
-            oe_channel: p.DMA_CH2,
-            oe_loop_channel: p.DMA_CH3,
-        }
+                pio: Pio::new(p.PIO0, Irqs),
+                r1: p.PIN_0,
+                g1: p.PIN_1,
+                b1: p.PIN_2,
+                r2: p.PIN_3,
+                g2: p.PIN_4,
+                b2: p.PIN_5,
+                a: p.PIN_6,
+                b: p.PIN_7,
+                c: p.PIN_8,
+                d: p.PIN_9,
+                clk: p.PIN_10,
+                lat: p.PIN_11,
+                oe: p.PIN_12,
+                fb_channel: p.DMA_CH0,
+                fb_loop_channel: p.DMA_CH1,
+                oe_channel: p.DMA_CH2,
+                oe_loop_channel: p.DMA_CH3,
+            }
         )))
     })
 }
