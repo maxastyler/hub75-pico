@@ -11,16 +11,22 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         overlays = [ (import rust-overlay) ];
-        pkgs = import nixpkgs { inherit system overlays; };
+        pkgs = import nixpkgs {
+          inherit system overlays;
+          config.allowUnfree = true;
+        };
       in with pkgs; {
         devShells.default = mkShell rec {
           buildInputs = [
             (rust-bin.nightly.latest.default.override {
               extensions = [ "rust-src" "rust-analyzer" "miri" ];
-              targets = [ "x86_64-unknown-linux-gnu" "thumbv8m.main-none-eabihf" ];
+              targets =
+                [ "x86_64-unknown-linux-gnu" "thumbv8m.main-none-eabihf" ];
             })
             probe-rs
             picotool
+
+            android-studio
 
             xorg.libX11
             xorg.libXrandr
@@ -33,9 +39,7 @@
             stdenv.cc.cc.lib
           ];
 
-          LD_LIBRARY_PATH = "${
-              nixpkgs.lib.makeLibraryPath buildInputs
-            }";
+          LD_LIBRARY_PATH = "${nixpkgs.lib.makeLibraryPath buildInputs}";
         };
       });
 }

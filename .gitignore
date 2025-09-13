@@ -1,3 +1,4 @@
 /pico/target
 .direnv
 /target/
+/android/.kotlin/
