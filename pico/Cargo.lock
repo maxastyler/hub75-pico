@@ -1857,6 +1857,7 @@ dependencies = [
  "embassy-time 0.4.0",
  "embedded-graphics",
  "libm",
+ "serde",
 ]
 
 [[package]]

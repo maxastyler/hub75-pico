@@ -6,6 +6,7 @@ use embedded_graphics::{
 
 use super::{StateUpdate, Visualisation};
 
+#[derive(serde::Serialize, serde::Deserialize)]
 pub enum TestVisUpdate {}
 
 impl StateUpdate for TestVisUpdate {}

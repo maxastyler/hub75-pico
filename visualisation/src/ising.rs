@@ -42,6 +42,7 @@ where
     }
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct IsingUpdate {}
 
 impl StateUpdate for IsingUpdate {}

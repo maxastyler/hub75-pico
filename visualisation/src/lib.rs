@@ -22,12 +22,12 @@ pub trait RngU32 {
     fn next_u32(&mut self) -> u32;
     /// random number between 0 and 1
     fn unit_f32(&mut self) -> f32 {
-	let n = (self.next_u32() % 100_000) as f32 / 100_000.0;
-	n
+        let n = (self.next_u32() % 100_000) as f32 / 100_000.0;
+        n
     }
 }
 
-pub trait StateUpdate {}
+pub trait StateUpdate: serde::Serialize + for<'de> serde::Deserialize<'de> {}
 
 pub trait Visualisation {
     type StateUpdate: StateUpdate;

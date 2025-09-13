@@ -76,6 +76,7 @@ where
     }
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct GameOfLifeUpdate {}
 
 impl StateUpdate for GameOfLifeUpdate {}

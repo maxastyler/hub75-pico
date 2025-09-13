@@ -167,6 +167,7 @@ where
     }
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct TurmiteUpdate;
 
 impl StateUpdate for TurmiteUpdate {}
