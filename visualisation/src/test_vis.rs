@@ -4,10 +4,14 @@ use embedded_graphics::{
     primitives::{Circle, PrimitiveStyle, StyledDrawable},
 };
 
+use crate::RngU32;
+
 use super::{StateUpdate, Visualisation};
 
 #[derive(serde::Serialize, serde::Deserialize)]
-pub enum TestVisUpdate {}
+pub enum TestVisUpdate {
+    Reset,
+}
 
 impl StateUpdate for TestVisUpdate {}
 
@@ -21,7 +25,7 @@ impl TestVis {
     }
 }
 
-impl Visualisation for TestVis {
+impl<Rng: RngU32> Visualisation<Rng> for TestVis {
     type StateUpdate = TestVisUpdate;
 
     fn update(&mut self, delta_time_us: u32) -> bool {
@@ -66,5 +70,17 @@ impl Visualisation for TestVis {
                 .draw_styled(&PrimitiveStyle::with_fill(Rgb888::YELLOW), target)
                 .unwrap();
         }
+    }
+
+    fn run_state_update(&mut self, state_update: Self::StateUpdate) {
+        todo!()
+    }
+
+    fn new(_rng: Rng) -> Self {
+        TestVis::new()
+    }
+
+    fn reset(&mut self) {
+        todo!()
     }
 }

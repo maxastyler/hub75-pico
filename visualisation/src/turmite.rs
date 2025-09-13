@@ -4,7 +4,7 @@ use embedded_graphics::{
     prelude::{Point, RgbColor},
 };
 
-use crate::{StateUpdate, Visualisation, grid::Grid};
+use crate::{RngU32, StateUpdate, Visualisation, grid::Grid};
 
 #[repr(u8)]
 #[derive(Copy, Clone)]
@@ -142,13 +142,13 @@ where
                 (State::A, Colour::B, Turn::Left),
                 (State::A, Colour::A, Turn::Right),
                 (State::B, Colour::B, Turn::Left),
-                (State::B, Colour::A, Turn::Right),		
+                (State::B, Colour::A, Turn::Right),
             ]),
             state: TurmiteState {
                 internal: State::A,
                 direction: Direction::Left,
-                x: W as i32/2,
-                y: H as i32/2,
+                x: W as i32 / 2,
+                y: H as i32 / 2,
             },
             grid: Grid::new(Colour::A),
         }
@@ -168,11 +168,13 @@ where
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
-pub struct TurmiteUpdate;
+pub enum TurmiteUpdate {
+    Reset,
+}
 
 impl StateUpdate for TurmiteUpdate {}
 
-impl<const W: usize, const H: usize> Visualisation for Turmite<W, H>
+impl<Rng: RngU32, const W: usize, const H: usize> Visualisation<Rng> for Turmite<W, H>
 where
     [(); W * H]:,
 {
@@ -203,5 +205,17 @@ where
                 )
             }))
             .unwrap()
+    }
+
+    fn run_state_update(&mut self, state_update: Self::StateUpdate) {
+        todo!()
+    }
+
+    fn new(_rng: Rng) -> Self {
+        Turmite::new()
+    }
+
+    fn reset(&mut self) {
+        todo!()
     }
 }

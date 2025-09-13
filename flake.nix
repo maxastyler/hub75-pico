@@ -20,9 +20,16 @@
           buildInputs = [
             (rust-bin.nightly.latest.default.override {
               extensions = [ "rust-src" "rust-analyzer" "miri" ];
-              targets =
-                [ "x86_64-unknown-linux-gnu" "thumbv8m.main-none-eabihf" ];
+              targets = [
+                "x86_64-unknown-linux-gnu"
+                "thumbv8m.main-none-eabihf"
+                "aarch64-linux-android"
+                "armv7-linux-androideabi"
+                "x86_64-linux-android"
+              ];
             })
+            cargo-expand
+            cargo-ndk
             probe-rs
             picotool
 

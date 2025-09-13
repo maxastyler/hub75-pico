@@ -146,17 +146,17 @@ where
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
-pub enum SandpileStateUpdate {
+pub enum SandPileStateUpdate {
     Reset,
 }
 
-impl StateUpdate for SandpileStateUpdate {}
+impl StateUpdate for SandPileStateUpdate {}
 
-impl<Rng: RngU32, const W: usize, const H: usize> Visualisation for SandPile<Rng, W, H>
+impl<Rng: RngU32, const W: usize, const H: usize> Visualisation<Rng> for SandPile<Rng, W, H>
 where
     [(); W * H]:,
 {
-    type StateUpdate = SandpileStateUpdate;
+    type StateUpdate = SandPileStateUpdate;
 
     fn update(&mut self, _delta_time_us: u32) -> bool {
         // for _ in 0..self.n_updates_per_iteration {
@@ -197,5 +197,17 @@ where
                 Pixel(Point::new(x, y), colour)
             }))
             .unwrap();
+    }
+
+    fn run_state_update(&mut self, state_update: Self::StateUpdate) {
+        todo!()
+    }
+
+    fn new(rng: Rng) -> Self {
+        SandPile::new(rng)
+    }
+
+    fn reset(&mut self) {
+        todo!()
     }
 }

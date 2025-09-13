@@ -6,7 +6,7 @@ use embassy_rp::pio::{Instance, Pio, PioPin};
 use embassy_time::Duration;
 
 use crate::{Display, FB_BYTES, Irqs, Lut};
-use visualisation::{CurrentState, GameOfLife, Ising, SandPile, Turmite};
+use visualisation::{CurrentVisualisationState, GameOfLife, Ising, SandPile, Turmite};
 
 struct Trng<'d> {
     trng: embassy_rp::trng::Trng<'d, embassy_rp::peripherals::TRNG>,
@@ -81,7 +81,7 @@ pub async fn run_display_core<L: Lut + Copy>(
     // let mut turmite = Turmite::new();
     // let mut state: CurrentState<Trng> = CurrentState::Turmite(turmite);
     // let mut state: CurrentState<Trng> = CurrentState::SandPile(SandPile::new(Trng::new()));
-    let mut state: CurrentState<Trng> = CurrentState::Ising(Ising::new(1.0, Trng::new()));
+    let mut state: CurrentVisualisationState<Trng> = CurrentVisualisationState::Ising(Ising::new(1.0, Trng::new()));
 
     let mut start_time = embassy_time::Instant::now();
 

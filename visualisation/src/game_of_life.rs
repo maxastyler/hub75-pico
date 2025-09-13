@@ -77,11 +77,11 @@ where
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
-pub struct GameOfLifeUpdate {}
+pub enum GameOfLifeUpdate {}
 
 impl StateUpdate for GameOfLifeUpdate {}
 
-impl<Rng: RngU32, const W: usize, const H: usize> Visualisation for GameOfLife<Rng, W, H>
+impl<Rng: RngU32, const W: usize, const H: usize> Visualisation<Rng> for GameOfLife<Rng, W, H>
 where
     [(); W * H]:,
 {
@@ -115,5 +115,17 @@ where
                 }
             }))
             .unwrap();
+    }
+
+    fn run_state_update(&mut self, state_update: Self::StateUpdate) {
+        todo!()
+    }
+
+    fn new(rng: Rng) -> Self {
+        GameOfLife::new_with_random(1_000, rng)
+    }
+
+    fn reset(&mut self) {
+        todo!()
     }
 }

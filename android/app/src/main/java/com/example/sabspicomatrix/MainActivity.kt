@@ -23,6 +23,7 @@ import com.example.sabspicomatrix.ui.theme.SabsPicoMatrixTheme
 import com.example.sabspicomatrix.vm.SimpleVM
 import dagger.hilt.android.AndroidEntryPoint
 import android.Manifest
+import android.util.Log
 import com.example.sabspicomatrix.repository.BluetoothPowerState
 import com.example.sabspicomatrix.repository.Discovery
 
@@ -56,7 +57,19 @@ fun Greeting(name: String, modifier: Modifier = Modifier, vm: SimpleVM = viewMod
         }
     val permission by vm.hasBluetoothPermission.collectAsStateWithLifecycle(false)
     val btState by vm.bluetoothPowerState.collectAsStateWithLifecycle()
+
+    val update =
+        uniffi.state_bindings.CurrentStateUpdate.GameOfLife(uniffi.state_bindings.GameOfLifeUpdate.RESET)
+
     Column {
+        Text("${uniffi.state_bindings.serializeState(update)}")
+        Text(
+            "${
+                uniffi.state_bindings.serializeState(update)
+                    ?.run { uniffi.state_bindings.deserializeState(this) }
+            }"
+        )
+        Text("${uniffi.state_bindings.add(2u, 3u)}")
         Button(onClick = { vm.start_discovery() }) {
             Text("start discovery")
         }
@@ -85,6 +98,9 @@ fun Greeting(name: String, modifier: Modifier = Modifier, vm: SimpleVM = viewMod
 
         } else {
             Button(onClick = {
+                Log.d("binding test", "${uniffi.state_bindings.add(2u, 3u)}")
+
+
                 launcher.launch(
                     arrayOf(
                         Manifest.permission.BLUETOOTH_SCAN,
